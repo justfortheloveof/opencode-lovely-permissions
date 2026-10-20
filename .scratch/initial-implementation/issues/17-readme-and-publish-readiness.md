@@ -6,8 +6,8 @@
 
 **Status:** ready-for-agent
 
-- [ ] The README covers install, the engine and its environment variable, the three policy files, layering, modes, verdicts, failures, and the `cd`-only gap
-- [ ] The README includes a minimal working policy example with the mode wrapper and the bash block
-- [ ] The README states the subagent result from spike 03
-- [ ] The package meets the Publish section checklist in the docs: name, version, entry point, files, and dependencies
-- [ ] `vp check` and `vp test` pass
+- [x] The README covers install, the engine and its environment variable, the three policy files, layering, modes, verdicts, failures, and the `cd`-only gap
+- [x] The README includes a minimal working policy example with the mode wrapper and the bash block
+- [x] The README states the subagent result from spike 03
+- [x] The package meets the Publish section checklist in the docs: name, version, entry point, files, and dependencies
+- [x] `vp check` and `vp test` pass
