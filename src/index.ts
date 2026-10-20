@@ -11,10 +11,9 @@ import {
   UNMATCHED_REASON,
 } from "./messages.ts";
 import { readLayeredPolicy } from "./policy-layers.ts";
-import type { ModePolicy } from "./policy-file.ts";
+import { DEFAULT_MODE, type ModePolicy } from "./policy-file.ts";
 
 const SHELL_ACTION = "shell";
-const DEFAULT_MODE = "default";
 const ABSENT_POLICY: ModePolicy = { bash: {}, wildcard: "ask" };
 
 export default Plugin.define({

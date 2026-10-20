@@ -6,8 +6,8 @@
 
 **Status:** ready-for-agent
 
-- [ ] With no option set, the `default` mode is used
-- [ ] With a named mode that exists, that mode's bash block is used
+- [x] With no option set, the `default` mode is used
+- [x] With a named mode that exists, that mode's bash block is used
 - [ ] A selected mode that does not exist denies every shell call, naming the mode and listing the modes that exist
 - [ ] A file with no `default` mode denies every shell call, naming the file
 - [ ] The mode is read once at setup, so changing it needs a restart
