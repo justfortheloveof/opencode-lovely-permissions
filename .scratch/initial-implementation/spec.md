@@ -122,8 +122,8 @@ If the engine is missing or the policy is invalid, every shell command is denied
 - **Policy vocabulary.** The bash block accepts exactly the keys the engine accepts: the wildcard, `error`, the two command allowlists, `output_redirection` (either a single level or an object over the four redirection kinds), and the level keys for input redirection, background execution, command substitution, process substitution, subshells, and variable assignments. The plugin validates with the engine, so the vocabulary is defined once, in the engine.
 - **Messages.** Three shapes, all built in one place:
   - Allow: no message.
-  - Ask: the brand label `💛 REQUIRES-USER-APPROVAL`, then the reasons as bullets.
-  - Deny: the brand label `❤️ auto-rejected`, then the reasons as bullets, then "The tool has not been run."
+  - Ask: the brand label `💛 REQUIRES-USER-APPROVAL`, then the reasons, one line per reason, each starting with `- `.
+  - Deny: the brand label `❤️ auto-rejected`, then the reasons, one line per reason, each starting with `- `, then "The tool has not been run."
   Messages are never built anywhere else.
 - **Missing or invalid policy.** No policy file: every shell call asks, with a warning. Invalid policy, or a missing engine: every shell call is denied, with a message naming the failure and the fix.
 - **Per-command failures.** A parse failure or an engine error on one command gives that command the `error` level, with the engine's message as its reason.
@@ -184,3 +184,6 @@ If the engine is missing or the policy is invalid, every shell command is denied
 **Prior decisions.** The decisions in this spec came out of a grilling session. Recorded decisions are in ADR 0001, ADR 0002, and ADR 0003. The vocabulary is in the glossary.
 
 **Branch.** This work is on the `initial-implementation` branch, branched from `dev`.
+
+- **Spike 03, rendering (OpenCode 2.0.30).** Denials render correctly. The TUI shows the deny message as separate lines: `[♡ perms: ❤️ auto-rejected]`, then `- Spike reason one: …` and `- Spike reason two: …` on their own lines, then `The tool has not been run.` Ask prompts do not. The TUI ask prompt shows only `△ Permission required` and `$ echo …`, with no permission message text, although the `permission.asked` event carries the full multi-line message. Because of this, the Messages decision now specifies one line per reason. Ask reasons are not visible in the prompt, which conflicts with the Solution's "showing the reasons as bullets" and with story 38 for asks. This needs a decision by the user.
+- **Spike 03, subagents.** Shell calls made by a subagent reach the permission hook. A `general` subagent's shell call fired `permission.evaluate` with its own session (`agent: general`, `parentID` set to the primary session). A deny from the hook blocked the call. Story 47 holds, so it is not amended.
