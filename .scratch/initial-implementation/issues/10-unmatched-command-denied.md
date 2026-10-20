@@ -4,7 +4,7 @@
 
 **Blocked by:** 09 (Allow, ask, and deny one command)
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [x] A permission request with no captured command gets the deny effect
 - [x] The message uses the deny label and the closing sentence, and says the command could not be matched

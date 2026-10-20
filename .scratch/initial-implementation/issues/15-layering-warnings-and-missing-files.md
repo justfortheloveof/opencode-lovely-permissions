@@ -4,7 +4,7 @@
 
 **Blocked by:** 14 (Layer the policy files)
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [x] A scalar overridden by a later file produces a warning naming the dotted key and both files
 - [x] Array and object merges produce no override warning

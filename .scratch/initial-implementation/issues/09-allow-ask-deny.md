@@ -4,12 +4,12 @@
 
 **Blocked by:** 03 (Spike: rendering and subagents), 06 (Engine client), 07 (Project policy file), 08 (Command capture)
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [x] Allow: the allow effect and no message
 - [x] Ask: the ask effect, with a message starting `[♡ perms: 💛 REQUIRES-USER-APPROVAL]` and one bullet per reason
 - [x] Deny: the deny effect, with a message starting `[♡ perms: ❤️ auto-rejected]`, one bullet per reason, and ending "The tool has not been run."
-- [ ] The policy's allow replaces an OpenCode ask, the policy's ask replaces an OpenCode allow, and the policy's deny replaces an OpenCode allow
-- [ ] An explicit OpenCode deny is not overridden, as confirmed in the spike
+- [x] The policy's allow replaces an OpenCode ask, the policy's ask replaces an OpenCode allow, and the policy's deny replaces an OpenCode allow
+- [x] An explicit OpenCode deny is not overridden, as confirmed in the spike
 - [x] Every message string is pinned as a literal in the tests
 - [x] Multi-line messages follow the spike's rendering result

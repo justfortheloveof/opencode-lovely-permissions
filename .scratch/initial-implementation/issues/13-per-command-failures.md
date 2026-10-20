@@ -4,7 +4,7 @@
 
 **Blocked by:** 09 (Allow, ask, and deny one command)
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [x] A stub that runs past 5 seconds is killed, and the verdict is the bash block's `error` level
 - [x] A stub that returns an error for one command gives the `error` level with the engine's message as the reason

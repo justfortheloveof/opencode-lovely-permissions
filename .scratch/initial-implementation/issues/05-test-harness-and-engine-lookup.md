@@ -4,7 +4,7 @@
 
 **Blocked by:** 01 (Scaffold the package)
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [x] The fake context captures the shell execute-before hook and the permission evaluate hook
 - [x] The stub engine records the request it received, and tests can read that record

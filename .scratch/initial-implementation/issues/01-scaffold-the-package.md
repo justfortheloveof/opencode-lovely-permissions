@@ -4,7 +4,7 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [x] `vp check` and `vp test` pass on the scaffold
 - [x] Package name, ESM type, and entry point match the spec, with no build step

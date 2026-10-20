@@ -4,7 +4,7 @@
 
 **Blocked by:** 06 (Engine client), 07 (Project policy file)
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [x] Setup sends the bash block to the engine's validate operation
 - [x] An unknown key denies every shell call, naming the key and listing the valid keys

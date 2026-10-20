@@ -4,7 +4,7 @@
 
 **Blocked by:** 02 (Spike: command capture), 05 (Test harness and engine lookup)
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [x] After the before hook fires, the command is retrievable by call ID
 - [x] The entry is removed when the call finishes

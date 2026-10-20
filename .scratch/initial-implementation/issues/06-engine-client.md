@@ -4,7 +4,7 @@
 
 **Blocked by:** 05 (Test harness and engine lookup)
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [x] The request contains the whole command line, the bash block, and the top-level wildcard, checked through the stub's recording
 - [x] Action, reason, and reasons are returned as received

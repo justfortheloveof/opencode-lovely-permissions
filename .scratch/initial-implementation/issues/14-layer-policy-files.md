@@ -4,7 +4,7 @@
 
 **Blocked by:** 04 (Spike: config directory), 07 (Project policy file)
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [x] The local file overrides the project file, which overrides the global file, per mode name
 - [x] Objects merge recursively, and arrays concatenate in file order

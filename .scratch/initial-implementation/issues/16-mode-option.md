@@ -4,7 +4,7 @@
 
 **Blocked by:** 14 (Layer the policy files)
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [x] With no option set, the `default` mode is used
 - [x] With a named mode that exists, that mode's bash block is used

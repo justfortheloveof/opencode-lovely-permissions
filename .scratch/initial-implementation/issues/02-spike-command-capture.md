@@ -4,7 +4,7 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [x] Recorded: whether `execute.before` fires before the permission request
 - [x] Recorded: whether the call ID matches between the before hook and the permission request

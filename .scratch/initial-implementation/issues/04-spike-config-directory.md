@@ -4,7 +4,7 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [x] Recorded: what the variable points to, and whether the global policy path follows it
 - [x] Recorded: whether the variable is read at plugin load or at each call

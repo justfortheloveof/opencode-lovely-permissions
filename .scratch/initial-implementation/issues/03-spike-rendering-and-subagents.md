@@ -4,7 +4,7 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [x] Recorded: whether multi-line messages render as bullets, with the rendered text as evidence
 - [x] If they do not, the spec's message decision is amended to one line per reason

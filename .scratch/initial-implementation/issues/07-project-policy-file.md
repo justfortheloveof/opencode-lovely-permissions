@@ -4,7 +4,7 @@
 
 **Blocked by:** 01 (Scaffold the package)
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [x] JSONC with comments and trailing commas parses
 - [x] A file with no `default` mode is reported as invalid

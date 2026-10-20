@@ -4,7 +4,7 @@
 
 **Blocked by:** 12 (Engine unusable at startup), 13 (Per-command failures), 15 (Layering warnings and missing files), 16 (Mode option)
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [x] The README covers install, the engine and its environment variable, the three policy files, layering, modes, verdicts, failures, and the `cd`-only gap
 - [x] The README includes a minimal working policy example with the mode wrapper and the bash block

@@ -29,6 +29,8 @@ Add the package name to `plugins` in your `opencode.jsonc`. Put it in your globa
 }
 ```
 
+To use a local checkout instead of the published package, put the checkout's directory in `plugins`, for example `"/home/me/opencode-lovely-bash-permissions"`. OpenCode does not accept a path to a `.ts` file.
+
 ### Install the engine
 
 ```bash

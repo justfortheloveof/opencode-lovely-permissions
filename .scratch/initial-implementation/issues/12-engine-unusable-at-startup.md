@@ -4,7 +4,7 @@
 
 **Blocked by:** 11 (Startup policy validation)
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [x] An engine that exits on start denies every shell call, with a message naming the failure and the fix
 - [x] A protocol version mismatch denies every shell call, with its own message naming the fix
