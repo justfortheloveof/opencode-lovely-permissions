@@ -9,10 +9,10 @@ let saved:
   | undefined;
 
 /**
- * Every test starts with no engine reachable and no real configuration. PATH is an
- * empty directory, the override is unset, and the global configuration directory is
- * empty, so a test that does not arrange them can never run the real engine or read
- * the user's policy. Lookup tests that need PATH set it themselves.
+ * Every test starts with no engine reachable and no global policy. PATH is an empty
+ * directory, the override is unset, and the configuration directory is empty, so a
+ * test that does not arrange them can never run the real engine or read the real
+ * user configuration. Tests that need them set them themselves.
  */
 beforeEach(() => {
   saved = {

@@ -83,7 +83,7 @@ describe("when no engine can be found", () => {
 describe("when the policy is valid", () => {
   test("setup sends the default mode's bash block to the engine's validate operation", async () => {
     const engine = useEngine({ protocol: 1, valid: true });
-    await startPlugin({ directory: projectWith({ default: { bash: BASH } }) });
+    await startPlugin(projectWith({ default: { bash: BASH } }));
     expect(engine.requests()).toEqual([{ op: "validate", config: BASH }]);
   });
 
@@ -95,9 +95,9 @@ describe("when the policy is valid", () => {
     );
     process.env.OPENCODE_CONFIG_DIR = globalDir;
     const engine = useEngine({ protocol: 1, valid: true });
-    await startPlugin({
-      directory: projectWith({ default: { bash: { allowed_cmds_regex: ["^git\\s+status$"] } } }),
-    });
+    await startPlugin(
+      projectWith({ default: { bash: { allowed_cmds_regex: ["^git\\s+status$"] } } }),
+    );
     expect(engine.requests()).toEqual([
       {
         op: "validate",
@@ -106,27 +106,32 @@ describe("when the policy is valid", () => {
     ]);
   });
 
-  test("a shell call is not denied, so the plugin leaves it unblocked", async () => {
-    useEngine({ protocol: 1, valid: true });
-    const harness = await startPlugin({ directory: projectWith({ default: { bash: BASH } }) });
-    const decision = await harness.evaluate({
-      action: "shell",
-      resources: ["git status"],
-      effect: "allow",
+  test("the plugin stays unblocked, so the engine's verdict is applied to a shell call", async () => {
+    const reason = "the command matches no allowed pattern";
+    useEngine({ protocol: 1, valid: true, action: "ask", reason, reasons: [reason] });
+    const harness = await startPlugin(projectWith({ default: { bash: BASH } }));
+    await harness.startCall({ tool: "shell", id: "call_valid", input: { command: "rm -rf /" } });
+    await expect(
+      harness.evaluate({
+        action: "shell",
+        resources: ["rm -rf /"],
+        effect: "allow",
+        source: { type: "tool", messageID: "msg_test", id: "call_valid" },
+      }),
+    ).resolves.toEqual({
+      effect: "ask",
+      message: "[♡ perms: 💛 REQUIRES-USER-APPROVAL]\n- the command matches no allowed pattern",
     });
-    expect(decision).toEqual({ effect: "allow", message: undefined });
   });
 });
 
 describe("when the engine rejects the policy", () => {
   test("an unknown key denies every shell call, naming the key and listing the valid keys", async () => {
     useEngine({ protocol: 1, valid: false, error: UNKNOWN_KEY_ERROR });
-    const harness = await startPlugin({
-      directory: projectWith({ default: { bash: { permission: "allow" } } }),
-    });
+    const harness = await startPlugin(projectWith({ default: { bash: { permission: "allow" } } }));
     const denial = [
       "[♡ perms: ❤️ auto-rejected]",
-      `- The bash policy is invalid: ${UNKNOWN_KEY_ERROR}. Fix the policy file and restart OpenCode.`,
+      `- the bash engine rejected the policy: ${UNKNOWN_KEY_ERROR}. Fix what it names, then restart OpenCode.`,
       "The tool has not been run.",
     ].join("\n");
     await expect(
@@ -146,16 +151,14 @@ describe("when the engine rejects the policy", () => {
       valid: false,
       error: "*: Input should be 'allow', 'deny' or 'ask' (got 'alow')",
     });
-    const harness = await startPlugin({
-      directory: projectWith({ default: { bash: { "*": "alow" } } }),
-    });
+    const harness = await startPlugin(projectWith({ default: { bash: { "*": "alow" } } }));
     await expect(
       harness.evaluate({ action: "shell", resources: ["git status"], effect: "allow" }),
     ).resolves.toEqual({
       effect: "deny",
       message: [
         "[♡ perms: ❤️ auto-rejected]",
-        "- The bash policy is invalid: *: Input should be 'allow', 'deny' or 'ask' (got 'alow'). Fix the policy file and restart OpenCode.",
+        "- the bash engine rejected the policy: *: Input should be 'allow', 'deny' or 'ask' (got 'alow'). Fix what it names, then restart OpenCode.",
         "The tool has not been run.",
       ].join("\n"),
     });
@@ -167,14 +170,14 @@ describe("when the policy file cannot be read or parsed", () => {
     useEngine({ protocol: 1, valid: true });
     const directory = projectWith({ build: { bash: BASH } });
     const file = join(directory, ".opencode", "lovely-permissions.jsonc");
-    const harness = await startPlugin({ directory });
+    const harness = await startPlugin(directory);
     await expect(
       harness.evaluate({ action: "shell", resources: ["git status"], effect: "allow" }),
     ).resolves.toEqual({
       effect: "deny",
       message: [
         "[♡ perms: ❤️ auto-rejected]",
-        `- The policy file ${file} is invalid: it has no "default" mode. Fix the file and restart OpenCode.`,
+        `- the policy file ${file} could not be used: it has no "default" mode. Fix the file and restart OpenCode.`,
         "The tool has not been run.",
       ].join("\n"),
     });
@@ -184,14 +187,14 @@ describe("when the policy file cannot be read or parsed", () => {
 describe("when the engine cannot check the policy", () => {
   test("a shell call is denied with the engine fix", async () => {
     useEngine("engine: unexpected output\n");
-    const harness = await startPlugin({ directory: projectWith({ default: { bash: BASH } }) });
+    const harness = await startPlugin(projectWith({ default: { bash: BASH } }));
     await expect(
       harness.evaluate({ action: "shell", resources: ["git status"], effect: "allow" }),
     ).resolves.toEqual({
       effect: "deny",
       message: [
         "[♡ perms: ❤️ auto-rejected]",
-        "- The bash engine could not check the policy: the engine did not answer with one JSON object. Reinstall it with `uv tool install lovely-bash-permissions`, or set LOVELY_PI_BASH_PERMISSIONS_BIN to a working engine binary, then restart OpenCode.",
+        "- the bash engine could not check the policy: the engine did not answer with one JSON object. Reinstall it with `uv tool install lovely-bash-permissions`, or set LOVELY_PI_BASH_PERMISSIONS_BIN to a working engine binary, then restart OpenCode.",
         "The tool has not been run.",
       ].join("\n"),
     });

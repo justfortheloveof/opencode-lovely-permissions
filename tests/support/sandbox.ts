@@ -10,11 +10,11 @@ export const sandboxRoot = mkdtempSync(join(tmpdir(), "lovely-perms-test-"));
 export const emptyPathDir = join(sandboxRoot, "empty-path");
 mkdirSync(emptyPathDir);
 
-/** A global configuration directory with no policy in it, so no test reads the real one. */
+/** A global configuration directory with no policy file, so no test reads the real one. */
 export const emptyConfigDir = join(sandboxRoot, "empty-config");
 mkdirSync(emptyConfigDir);
 
-/** A project directory with no `.opencode` policy in it. */
+/** A project directory with no policy file. */
 export const emptyProjectDir = join(sandboxRoot, "empty-project");
 mkdirSync(emptyProjectDir);
 

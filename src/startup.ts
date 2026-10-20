@@ -3,30 +3,29 @@ import {
   denyMessage,
   engineUnusableReason,
   ENGINE_NOT_FOUND_REASON,
-  invalidFileReason,
+  invalidPolicyReason,
   rejectedPolicyReason,
 } from "./messages.ts";
-import { DEFAULT_MODE } from "./policy-file.ts";
-import { readLayeredPolicy } from "./policy-layers.ts";
+import type { ModePolicy } from "./policy-file.ts";
+import type { LayeredPolicy } from "./policy-layers.ts";
 
-/** A blocked plugin denies every shell call with its message. Later failures reuse this state. */
-export type Startup = { status: "ready" } | { status: "blocked"; message: string };
-
-const READY: Startup = { status: "ready" };
+/** Ready names the engine to ask about each command. Blocked denies every shell call with its message. */
+export type Startup = { status: "ready"; engine: string } | { status: "blocked"; message: string };
 
 export async function checkStartup(
-  directory: string,
   engine: string | undefined,
+  policy: LayeredPolicy,
+  mode: ModePolicy,
 ): Promise<Startup> {
   if (engine === undefined) return blocked(ENGINE_NOT_FOUND_REASON);
-
-  const policy = await readLayeredPolicy(directory);
-  if (policy.status === "absent") return READY;
-  if (policy.status === "invalid") return blocked(invalidFileReason(policy.file, policy.reason));
+  if (policy.status === "invalid") return blocked(invalidPolicyReason(policy.file, policy.reason));
+  if (policy.status === "absent") return { status: "ready", engine };
 
   try {
-    const validation = await validate(engine, policy.modes[DEFAULT_MODE].bash);
-    return validation.valid ? READY : blocked(rejectedPolicyReason(validation.error));
+    const validation = await validate(engine, mode.bash);
+    return validation.valid
+      ? { status: "ready", engine }
+      : blocked(rejectedPolicyReason(validation.error));
   } catch (error) {
     return blocked(engineUnusableReason(error instanceof Error ? error.message : String(error)));
   }
