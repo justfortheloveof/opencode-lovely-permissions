@@ -6,9 +6,9 @@
 
 **Status:** ready-for-agent
 
-- [ ] `vp check` and `vp test` pass on the scaffold
-- [ ] Package name, ESM type, and entry point match the spec, with no build step
-- [ ] `@opencode/plugin` is pinned to 2.0.30 and vite-plus to 1.3.0
-- [ ] Pre-commit runs `vp staged`
-- [ ] The plugin has a stable identifier and registers no behaviour yet
-- [ ] Existing `docs/`, `GLOSSARY.md`, and `AGENTS.md` are unchanged
+- [x] `vp check` and `vp test` pass on the scaffold
+- [x] Package name, ESM type, and entry point match the spec, with no build step
+- [x] `@opencode/plugin` is pinned to 2.0.30 and vite-plus to 1.3.0
+- [x] Pre-commit runs `vp staged`
+- [x] The plugin has a stable identifier and registers no behaviour yet
+- [x] Existing `docs/`, `GLOSSARY.md`, and `AGENTS.md` are unchanged
