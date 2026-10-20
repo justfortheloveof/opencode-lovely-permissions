@@ -6,7 +6,7 @@
 
 **Status:** ready-for-agent
 
-- [ ] Recorded: what the variable points to, and whether the global policy path follows it
-- [ ] Recorded: whether the variable is read at plugin load or at each call
-- [ ] If the variable does not move the policy path, the spec's global file decision is amended to the default location
-- [ ] The spike does not read or write the user's real `~/.config/opencode`
+- [x] Recorded: what the variable points to, and whether the global policy path follows it
+- [x] Recorded: whether the variable is read at plugin load or at each call
+- [x] If the variable does not move the policy path, the spec's global file decision is amended to the default location
+- [x] The spike does not read or write the user's real `~/.config/opencode`
