@@ -12,3 +12,7 @@ Status: ready-for-human
 - [ ] If an older copy is cached on the terminal machine: which copy loads? Record it.
 - [ ] A remote server without the server half: no banner and no error. Record the result.
 - [ ] Record the results under `## Comments` at the bottom of this file.
+
+## Comments
+
+- 2026-10-20: The user plans to run this check after tickets 05–08 are merged.
