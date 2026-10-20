@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { parse, printParseErrorCode, type ParseError } from "jsonc-parser";
 
 export const POLICY_FILE_NAME = "lovely-permissions.jsonc";
-const DEFAULT_MODE = "default";
+export const DEFAULT_MODE = "default";
 
 type Invalid = { status: "invalid"; file: string; reason: string };
 

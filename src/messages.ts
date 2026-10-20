@@ -9,3 +9,8 @@ export function denyMessage(reasons: readonly string[]): string {
 }
 
 export const ENGINE_NOT_FOUND_REASON = `${ENGINE_BINARY} was not found. Install it with \`uv tool install lovely-bash-permissions\`, or set ${ENGINE_OVERRIDE} to the path of an existing engine binary.`;
+
+export function unknownModeReason(mode: string, modes: readonly string[]): string {
+  const names = modes.map((name) => `"${name}"`).join(", ");
+  return `the mode option selects "${mode}", but no policy file defines that mode. The modes that exist are: ${names}. Set the mode option to one of them, then restart OpenCode.`;
+}
