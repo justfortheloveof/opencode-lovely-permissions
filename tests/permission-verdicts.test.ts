@@ -123,11 +123,12 @@ describe("the engine request", () => {
     ]);
   });
 
-  test("with no policy file, the engine is asked with an empty bash block and the wildcard ask", async () => {
+  test("with no policy file, the engine is checked with an empty bash block, then asked with the wildcard ask", async () => {
     const engine = engineAnswering(verdict("ask", ASK_REASONS));
     const harness = await startPlugin();
     await judge(harness, "call_no_policy", "git status", "allow");
     expect(engine.requests()).toEqual([
+      { op: "validate", config: {} },
       { op: "evaluate", command: "git status", config: {}, top_level: "ask" },
     ]);
   });
@@ -148,7 +149,7 @@ describe("an invalid policy file", () => {
 });
 
 describe("a shell call with no captured command", () => {
-  test("is denied as unmatched, without asking the engine", async () => {
+  test("is denied as unmatched, without asking the engine for a verdict", async () => {
     const engine = engineAnswering(verdict("allow", ALLOW_REASONS));
     const harness = await startPlugin();
     expect(
@@ -163,6 +164,6 @@ describe("a shell call with no captured command", () => {
       message:
         "[♡ perms: ❤️ auto-rejected]\n- the command could not be matched to its tool call\nThe tool has not been run.",
     });
-    expect(engine.requests()).toEqual([]);
+    expect(engine.requests()).toEqual([{ op: "validate", config: {} }]);
   });
 });

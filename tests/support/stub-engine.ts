@@ -18,23 +18,31 @@ export interface StubEngine {
  * at an empty directory and `/usr/bin/env node` would not find Node.
  */
 export function stubEngine(response: Record<string, unknown> | string): StubEngine {
+  return writeStub((record) => [
+    `const { appendFileSync } = require("node:fs");`,
+    `let input = "";`,
+    `process.stdin.setEncoding("utf8");`,
+    `process.stdin.on("data", (chunk) => { input += chunk; });`,
+    `process.stdin.on("end", () => {`,
+    `  appendFileSync(${JSON.stringify(record)}, JSON.stringify(JSON.parse(input)) + "\\n");`,
+    `  process.stdout.write(${JSON.stringify(`${typeof response === "string" ? response : JSON.stringify(response)}\n`)});`,
+    `});`,
+  ]);
+}
+
+/**
+ * A stand-in for an engine that dies on start: it exits with `code` before it reads
+ * its request, and it writes no answer. Its requests list is always empty.
+ */
+export function crashingEngine(code: number): StubEngine {
+  return writeStub(() => [`process.exit(${code});`]);
+}
+
+function writeStub(body: (record: string) => string[]): StubEngine {
   const dir = mkdtempSync(join(sandboxRoot, "engine-"));
   const path = join(dir, "lovely-pi-bash-permissions");
   const record = join(dir, "requests.jsonl");
-  writeFileSync(
-    path,
-    [
-      `#!${process.execPath}`,
-      `const { appendFileSync } = require("node:fs");`,
-      `let input = "";`,
-      `process.stdin.setEncoding("utf8");`,
-      `process.stdin.on("data", (chunk) => { input += chunk; });`,
-      `process.stdin.on("end", () => {`,
-      `  appendFileSync(${JSON.stringify(record)}, JSON.stringify(JSON.parse(input)) + "\\n");`,
-      `  process.stdout.write(${JSON.stringify(`${typeof response === "string" ? response : JSON.stringify(response)}\n`)});`,
-      `});`,
-    ].join("\n"),
-  );
+  writeFileSync(path, [`#!${process.execPath}`, ...body(record)].join("\n"));
   chmodSync(path, 0o755);
   return {
     path,

@@ -1,4 +1,5 @@
 import { ENGINE_BINARY, ENGINE_OVERRIDE } from "./engine.ts";
+import { PROTOCOL_VERSION } from "./engine-client.ts";
 
 export const ASK_LABEL = "[♡ perms: 💛 REQUIRES-USER-APPROVAL]";
 export const DENY_LABEL = "[♡ perms: ❤️ auto-rejected]";
@@ -25,7 +26,13 @@ export function rejectedPolicyReason(error: string): string {
 }
 
 export function engineUnusableReason(detail: string): string {
-  return `the bash engine could not check the policy: ${detail}. Reinstall it with \`uv tool install lovely-bash-permissions\`, or set ${ENGINE_OVERRIDE} to a working engine binary, then restart OpenCode.`;
+  return `the bash engine did not start or answer: ${detail}. Reinstall it with \`uv tool install lovely-bash-permissions\`, or set ${ENGINE_OVERRIDE} to a working engine binary, then restart OpenCode.`;
+}
+
+export function protocolMismatchReason(found: unknown): string {
+  const answered =
+    found === undefined ? "no protocol version" : `protocol ${JSON.stringify(found)}`;
+  return `the bash engine answered with ${answered}, but this plugin needs protocol ${PROTOCOL_VERSION}. Install an engine that speaks protocol ${PROTOCOL_VERSION} with \`uv tool install --force lovely-bash-permissions\`, or set ${ENGINE_OVERRIDE} to one, or update this plugin to a version that matches the engine, then restart OpenCode.`;
 }
 
 export const ENGINE_NOT_FOUND_REASON = `${ENGINE_BINARY} was not found. Install it with \`uv tool install lovely-bash-permissions\`, or set ${ENGINE_OVERRIDE} to the path of an existing engine binary.`;

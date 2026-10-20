@@ -1,8 +1,17 @@
 import { spawn } from "node:child_process";
 
-const PROTOCOL_VERSION = 1;
+export const PROTOCOL_VERSION = 1;
 
 export class EngineError extends Error {}
+
+/** The engine answered, but with a protocol version other than the one this plugin speaks. */
+export class ProtocolMismatchError extends EngineError {
+  constructor(readonly found: unknown) {
+    super(
+      `the engine answered with protocol ${String(found)}; this plugin needs protocol ${PROTOCOL_VERSION}`,
+    );
+  }
+}
 
 export interface EvaluateRequest {
   command: string;
@@ -47,14 +56,14 @@ function exchange(engine: string, payload: object): Promise<Record<string, unkno
       stdout += chunk;
     });
     child.on("error", (error) => {
-      reject(new EngineError(`the engine could not be started: ${error.message}`));
+      reject(new EngineError(`it could not be started: ${error.message}`));
     });
     child.stdin.on("error", () => {
       // A failed write means the engine went away. The error or close event reports why.
     });
-    child.on("close", () => {
+    child.on("close", (code, signal) => {
       try {
-        resolve(answerFrom(stdout));
+        resolve(answerFrom(stdout, uncleanExit(code, signal)));
       } catch (error) {
         reject(error);
       }
@@ -63,14 +72,18 @@ function exchange(engine: string, payload: object): Promise<Record<string, unkno
   });
 }
 
-function answerFrom(stdout: string): Record<string, unknown> {
-  const answer = parseAnswer(stdout);
+function answerFrom(stdout: string, exit: string | undefined): Record<string, unknown> {
+  const answer = parseAnswer(stdout, exit);
   if (answer.protocol !== PROTOCOL_VERSION) {
-    throw new EngineError(
-      `the engine answered with protocol ${String(answer.protocol)}; this plugin needs protocol ${PROTOCOL_VERSION}`,
-    );
+    throw new ProtocolMismatchError(answer.protocol);
   }
   return answer;
+}
+
+/** How the engine exited when that was not a clean exit, or undefined for code 0. */
+function uncleanExit(code: number | null, signal: NodeJS.Signals | null): string | undefined {
+  if (code === 0) return undefined;
+  return signal === null ? `with code ${code}` : `on signal ${signal}`;
 }
 
 function verdictFrom(answer: Record<string, unknown>): Verdict {
@@ -83,17 +96,25 @@ function verdictFrom(answer: Record<string, unknown>): Verdict {
   return { action, reason, reasons };
 }
 
-function parseAnswer(stdout: string): Record<string, unknown> {
+function parseAnswer(stdout: string, exit: string | undefined): Record<string, unknown> {
   let answer: unknown;
   try {
     answer = JSON.parse(stdout);
   } catch {
-    throw new EngineError("the engine did not answer with one JSON object");
+    throw noAnswer(exit);
   }
   if (!isRecord(answer)) {
-    throw new EngineError("the engine did not answer with one JSON object");
+    throw noAnswer(exit);
   }
   return answer;
+}
+
+function noAnswer(exit: string | undefined): EngineError {
+  return new EngineError(
+    exit === undefined
+      ? "it did not answer with one JSON object"
+      : `it exited ${exit} before answering`,
+  );
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

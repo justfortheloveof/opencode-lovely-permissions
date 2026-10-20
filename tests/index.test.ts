@@ -4,7 +4,7 @@ import { describe, expect, test } from "vite-plus/test";
 import plugin from "../src/index.ts";
 import { startPlugin } from "./support/fake-context.ts";
 import { sandboxRoot } from "./support/sandbox.ts";
-import { stubEngine, type StubEngine } from "./support/stub-engine.ts";
+import { crashingEngine, stubEngine, type StubEngine } from "./support/stub-engine.ts";
 
 const NOT_FOUND_DENIAL = [
   "[♡ perms: ❤️ auto-rejected]",
@@ -184,8 +184,8 @@ describe("when the policy file cannot be read or parsed", () => {
   });
 });
 
-describe("when the engine cannot check the policy", () => {
-  test("a shell call is denied with the engine fix", async () => {
+describe("when the engine gives no answer", () => {
+  test("a shell call is denied, naming the failure and the fix", async () => {
     useEngine("engine: unexpected output\n");
     const harness = await startPlugin(projectWith({ default: { bash: BASH } }));
     await expect(
@@ -194,7 +194,119 @@ describe("when the engine cannot check the policy", () => {
       effect: "deny",
       message: [
         "[♡ perms: ❤️ auto-rejected]",
-        "- the bash engine could not check the policy: the engine did not answer with one JSON object. Reinstall it with `uv tool install lovely-bash-permissions`, or set LOVELY_PI_BASH_PERMISSIONS_BIN to a working engine binary, then restart OpenCode.",
+        "- the bash engine did not start or answer: it did not answer with one JSON object. Reinstall it with `uv tool install lovely-bash-permissions`, or set LOVELY_PI_BASH_PERMISSIONS_BIN to a working engine binary, then restart OpenCode.",
+        "The tool has not been run.",
+      ].join("\n"),
+    });
+  });
+});
+
+function unrunnableEngine(): string {
+  const dir = mkdtempSync(join(sandboxRoot, "engine-"));
+  const path = join(dir, "lovely-pi-bash-permissions");
+  writeFileSync(path, "", { mode: 0o644 });
+  return path;
+}
+
+describe("when the engine exits on start", () => {
+  const DENIAL = [
+    "[♡ perms: ❤️ auto-rejected]",
+    "- the bash engine did not start or answer: it exited with code 1 before answering. Reinstall it with `uv tool install lovely-bash-permissions`, or set LOVELY_PI_BASH_PERMISSIONS_BIN to a working engine binary, then restart OpenCode.",
+    "The tool has not been run.",
+  ].join("\n");
+
+  test("every shell call is denied, naming the failure and the fix", async () => {
+    process.env.LOVELY_PI_BASH_PERMISSIONS_BIN = crashingEngine(1).path;
+    const harness = await startPlugin(projectWith({ default: { bash: BASH } }));
+    await expect(
+      harness.evaluate({ action: "shell", resources: ["git status"], effect: "allow" }),
+    ).resolves.toEqual({ effect: "deny", message: DENIAL });
+    await expect(
+      harness.evaluate({ action: "shell", resources: ["rm -rf /"], effect: "ask" }),
+    ).resolves.toEqual({ effect: "deny", message: DENIAL });
+    await expect(
+      harness.evaluate({ action: "read", resources: ["/etc/hosts"], effect: "allow" }),
+    ).resolves.toEqual({ effect: "allow", message: undefined });
+  });
+
+  test("a shell call whose command was captured is denied too, for the rest of the session", async () => {
+    process.env.LOVELY_PI_BASH_PERMISSIONS_BIN = crashingEngine(1).path;
+    const harness = await startPlugin(projectWith({ default: { bash: BASH } }));
+    await harness.startCall({
+      tool: "shell",
+      id: "call_blocked",
+      input: { command: "git status" },
+    });
+    await expect(
+      harness.evaluate({
+        action: "shell",
+        resources: ["git status"],
+        effect: "allow",
+        source: { type: "tool", messageID: "msg_test", id: "call_blocked" },
+      }),
+    ).resolves.toEqual({ effect: "deny", message: DENIAL });
+  });
+
+  test("with no policy file, every shell call is still denied", async () => {
+    process.env.LOVELY_PI_BASH_PERMISSIONS_BIN = crashingEngine(1).path;
+    const harness = await startPlugin();
+    await expect(
+      harness.evaluate({ action: "shell", resources: ["git status"], effect: "allow" }),
+    ).resolves.toEqual({ effect: "deny", message: DENIAL });
+  });
+});
+
+describe("when the engine cannot be started", () => {
+  test("every shell call is denied, naming the failure and the fix", async () => {
+    const path = unrunnableEngine();
+    process.env.LOVELY_PI_BASH_PERMISSIONS_BIN = path;
+    const harness = await startPlugin(projectWith({ default: { bash: BASH } }));
+    await expect(
+      harness.evaluate({ action: "shell", resources: ["git status"], effect: "allow" }),
+    ).resolves.toEqual({
+      effect: "deny",
+      message: [
+        "[♡ perms: ❤️ auto-rejected]",
+        `- the bash engine did not start or answer: it could not be started: spawn ${path} EACCES. Reinstall it with \`uv tool install lovely-bash-permissions\`, or set LOVELY_PI_BASH_PERMISSIONS_BIN to a working engine binary, then restart OpenCode.`,
+        "The tool has not been run.",
+      ].join("\n"),
+    });
+  });
+});
+
+describe("when the engine speaks another protocol version", () => {
+  const FIX =
+    "Install an engine that speaks protocol 1 with `uv tool install --force lovely-bash-permissions`, or set LOVELY_PI_BASH_PERMISSIONS_BIN to one, or update this plugin to a version that matches the engine, then restart OpenCode.";
+
+  test("every shell call is denied with the protocol message, naming the fix", async () => {
+    useEngine({ protocol: 2, valid: true });
+    const harness = await startPlugin(projectWith({ default: { bash: BASH } }));
+    const denial = [
+      "[♡ perms: ❤️ auto-rejected]",
+      `- the bash engine answered with protocol 2, but this plugin needs protocol 1. ${FIX}`,
+      "The tool has not been run.",
+    ].join("\n");
+    await expect(
+      harness.evaluate({ action: "shell", resources: ["git status"], effect: "allow" }),
+    ).resolves.toEqual({ effect: "deny", message: denial });
+    await expect(
+      harness.evaluate({ action: "shell", resources: ["rm -rf /"], effect: "ask" }),
+    ).resolves.toEqual({ effect: "deny", message: denial });
+    await expect(
+      harness.evaluate({ action: "read", resources: ["/etc/hosts"], effect: "allow" }),
+    ).resolves.toEqual({ effect: "allow", message: undefined });
+  });
+
+  test("an answer with no protocol version is a mismatch too", async () => {
+    useEngine({ valid: true });
+    const harness = await startPlugin(projectWith({ default: { bash: BASH } }));
+    await expect(
+      harness.evaluate({ action: "shell", resources: ["git status"], effect: "allow" }),
+    ).resolves.toEqual({
+      effect: "deny",
+      message: [
+        "[♡ perms: ❤️ auto-rejected]",
+        `- the bash engine answered with no protocol version, but this plugin needs protocol 1. ${FIX}`,
         "The tool has not been run.",
       ].join("\n"),
     });

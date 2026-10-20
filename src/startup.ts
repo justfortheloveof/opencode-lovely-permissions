@@ -1,9 +1,10 @@
-import { validate } from "./engine-client.ts";
+import { ProtocolMismatchError, validate } from "./engine-client.ts";
 import {
   denyMessage,
   engineUnusableReason,
   ENGINE_NOT_FOUND_REASON,
   invalidPolicyReason,
+  protocolMismatchReason,
   rejectedPolicyReason,
 } from "./messages.ts";
 import type { ModePolicy } from "./policy-file.ts";
@@ -19,7 +20,6 @@ export async function checkStartup(
 ): Promise<Startup> {
   if (engine === undefined) return blocked(ENGINE_NOT_FOUND_REASON);
   if (policy.status === "invalid") return blocked(invalidPolicyReason(policy.file, policy.reason));
-  if (policy.status === "absent") return { status: "ready", engine };
 
   try {
     const validation = await validate(engine, mode.bash);
@@ -27,6 +27,7 @@ export async function checkStartup(
       ? { status: "ready", engine }
       : blocked(rejectedPolicyReason(validation.error));
   } catch (error) {
+    if (error instanceof ProtocolMismatchError) return blocked(protocolMismatchReason(error.found));
     return blocked(engineUnusableReason(error instanceof Error ? error.message : String(error)));
   }
 }

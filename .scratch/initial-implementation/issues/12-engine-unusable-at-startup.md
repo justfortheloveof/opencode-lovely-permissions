@@ -6,7 +6,7 @@
 
 **Status:** ready-for-agent
 
-- [ ] An engine that exits on start denies every shell call, with a message naming the failure and the fix
-- [ ] A protocol version mismatch denies every shell call, with its own message naming the fix
-- [ ] The blocked state applies to every shell call for the rest of the session
-- [ ] The denial uses the auto-rejected label and the closing sentence
+- [x] An engine that exits on start denies every shell call, with a message naming the failure and the fix
+- [x] A protocol version mismatch denies every shell call, with its own message naming the fix
+- [x] The blocked state applies to every shell call for the rest of the session
+- [x] The denial uses the auto-rejected label and the closing sentence
