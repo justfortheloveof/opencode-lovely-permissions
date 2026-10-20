@@ -10,6 +10,7 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
+    "./tui": "./src/tui.ts",
     "./package.json": "./package.json"
   },
   "publishConfig": {
@@ -25,10 +26,29 @@
     "jsonc-parser": "^3.3.1"
   },
   "devDependencies": {
+    "@opentui/core": "0.5.17",
+    "@opentui/solid": "0.5.17",
     "@types/node": "^26.6.5",
     "@vitest/coverage-v8": "5.0.5",
+    "solid-js": "1.9.15",
     "typescript": "^7.0.2",
     "vite-plus": "catalog:"
+  },
+  "peerDependencies": {
+    "@opentui/core": ">=0.5.17",
+    "@opentui/solid": ">=0.5.17",
+    "solid-js": ">=1.9.0"
+  },
+  "peerDependenciesMeta": {
+    "@opentui/core": {
+      "optional": true
+    },
+    "@opentui/solid": {
+      "optional": true
+    },
+    "solid-js": {
+      "optional": true
+    }
   },
   "devEngines": {
     "packageManager": {

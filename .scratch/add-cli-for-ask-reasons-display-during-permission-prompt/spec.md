@@ -77,7 +77,8 @@ Documentation
 ## Implementation Decisions
 
 - The server half is unchanged. Verdicts, the ask message, and the deny message keep their current content and placement. The ask brand label and deny brand label stay as the glossary defines them.
-- The terminal half is a second entry point of this package, exported beside the server entry and shipped in the package. OpenCode loads it when the connected server lists the package as active with a terminal entry, and also from the terminal client's `cli.json`. The `cli.json` entry is required, so the banner works against any server.
+- The terminal half is a second entry point of this package, exported beside the server entry and shipped in the package as `src/tui.ts`. OpenCode loads it when the connected server lists the package as active with a terminal entry, and also from the terminal client's `cli.json`. The `cli.json` entry is required, so the banner works against any server.
+- The terminal entry must contain no raw JSX syntax. It builds Solid elements with explicit `jsx()` calls (and `jsxs()` when needed) imported from the host virtual runtime module `opentui:runtime-module:%40opentui%2Fsolid%2Fjsx-runtime`, and imports the plugin SDK from `opentui:runtime-module:%40opencode%2Fplugin%2Ftui`. OpenCode's external package loader provides these host modules. The OpenTUI Solid transform excludes source under `node_modules`, and Bun may inject an unresolvable React or local JSX-runtime import for external JSX; do not ship raw JSX or work around this with React or a local/Vite JSX transform.
 - The banner is one slot above the composer in the session view. The slot receives the session ID.
 - Which ask the banner shows follows the permission prompt. It takes the first pending ask across the viewed session and its descendant sessions, in that order. Nothing shows when the viewed session has a parent. Nothing shows when the chosen ask's message does not start with the ask brand label, or when the ask has no reasons. The choice is a pure rule. The slot gathers the ordered asks and passes them to the rule, so the rule can be tested without the UI.
 - Autoaccept is not mirrored, because the terminal plugin API does not expose the permission mode. In autoaccept mode the banner may flash briefly before OpenCode approves the ask.
@@ -86,7 +87,7 @@ Documentation
 - A failure in the terminal half must not affect the prompt, the verdict, or the deny message. It shows nothing when it fails.
 - Dependencies: keep `@opencode/plugin` pinned at 2.0.30. Declare `@opentui/core` and `@opentui/solid` at `>=0.5.17` and `solid-js` at `>=1.9.0`, all as optional peers. Dev dependencies pin `@opentui/core` 0.5.17, `@opentui/solid` 0.5.17, and `solid-js` 1.9.15, matching OpenCode's own pins.
 - Documentation: the glossary entries **Ask banner** and **Deny message** and ADR 0004 are already in place. At ship time, the README gains the `cli.json` instruction, and its known limitation about ask prompts is removed.
-- The new test seams are the pure rule that picks the ask, and the terminal plugin's setup, exercised through a fake terminal-client context. See Testing Decisions.
+- The new test seams are the pure rule that picks the ask, and the terminal plugin's setup, exercised through a fake terminal-client context. The package-entry test separately imports the public `opencode-lovely-bash-permissions/tui` subpath through the package manifest. See Testing Decisions.
 
 ## Testing Decisions
 
@@ -97,9 +98,9 @@ Modules and cases:
 - **Terminal rule (pure function).** Cases: the banner shows the chosen ask's message verbatim; the first pending ask is chosen; no banner for an ask without the brand label, even when a later ask has it; no banner in a child session; no banner when nothing is pending; no banner for an ask with no reasons; the missing-policy ask is shown.
 - **Terminal plugin (fake harness).** The harness records the composer-top slot and drives its render with fake session data and pending requests. Cases: the slot passes the viewed session's asks, then its subagents' asks in family order, to the rule; a sync runs on mount for the viewed session and its family; the banner clears when its ask is answered and the next ask appears; a failing data read or rule renders nothing and does not throw.
 - **Server half (existing harness).** Regression only. The existing tests keep the ask and deny messages unchanged.
-- **Package manifest.** Extend the existing package-entry test: the terminal export is listed in the manifest and shipped, and the peer ranges are declared as optional.
+- **Package entry and manifest.** Extend the existing package-entry test to import the public `opencode-lovely-bash-permissions/tui` subpath, verify its plugin identifier, and check that the manifest exports and ships `src/tui.ts` with the optional peer ranges. Test-only aliases provide small fakes for the two host virtual runtime IDs, so this test does not need a JSX transform or React. It verifies the package's public entry seam, not OpenCode's actual runtime-module loader.
 
-Rendered output is not automated. It is checked by hand in a local session, and in a remote session where the server half runs and the terminal machine has the `cli.json` entry.
+Rendered output is not automated. Ticket 10 is the human-only in-app check; ticket 09 is the human-only remote-loading check, including the terminal machine's `cli.json` entry. Ticket 02 does not claim local in-app or remote validation, and tickets 09/10 remain open for human verification.
 
 Prior art: `tests/support/fake-context.ts` (the server harness, which the new harness should mirror), `tests/index.test.ts` (hook and verdict tests), and `tests/package-entry.test.ts` (manifest checks).
 
