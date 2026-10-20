@@ -31,6 +31,10 @@ Add the package name to `plugins` in your `opencode.jsonc`. Put it in your globa
 
 To use a local checkout instead of the published package, put the checkout's directory in `plugins`, for example `"/home/me/opencode-lovely-bash-permissions"`. OpenCode does not accept a path to a `.ts` file.
 
+### Remote servers
+
+If OpenCode runs on a remote server, that server must load this plugin too. A server without it runs shell commands under OpenCode's default rules, not your policy.
+
 ### Install the engine
 
 ```bash
@@ -146,7 +150,7 @@ To change mode, change the option and restart OpenCode. Switching modes inside a
 
 - **Allow** runs the command. You see nothing: no prompt and no message.
 - **Ask** pauses the command for your approval. The plugin's message starts with `[♡ perms: 💛 REQUIRES-USER-APPROVAL]` and lists the reasons, one bullet each. In OpenCode 2.0.30 the prompt shows only the command; see [Known limitations](#known-limitations).
-- **Deny** stops the command. The message starts with `[♡ perms: ❤️ auto-rejected]`, lists the reasons, one bullet each, and ends with `The tool has not been run.` In OpenCode 2.0.30 denials render in full.
+- **Deny** stops the command. The message starts with `[♡ perms: ❤️ auto-rejected]`, lists the reasons, one bullet each, and ends with `The tool has not been run.` In OpenCode 2.0.30 the reasons show only after you expand the denied row.
 
 Your policy overrides OpenCode's own allow and ask for shell commands, in both directions. OpenCode's explicit deny always stands.
 

@@ -35,10 +35,19 @@ _Avoid_: permission (alone, since OpenCode uses that word for its own rules)
 
 **Reason**:
 One line explaining a verdict. Several reasons show as bullets.
+_Avoid_: approve reason, approval reason
 
 **Brand label**:
 The `[♡ perms: …]` prefix on every message this plugin shows, naming the verdict (for example `💛 REQUIRES-USER-APPROVAL`).
 _Avoid_: tag, header
+
+**Ask banner**:
+The display of a pending ask's reasons while the user decides. It disappears once the ask is answered.
+_Avoid_: prompt, notice
+
+**Deny message**:
+The message for a denied command. It carries the brand label and the reasons, and the agent reads it.
+_Avoid_: error, tool error
 
 **Pi extension**:
 `lovely-pi-permissions`, the TypeScript Pi client that runs the engine.
