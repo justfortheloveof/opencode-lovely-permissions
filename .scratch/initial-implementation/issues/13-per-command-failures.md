@@ -6,7 +6,7 @@
 
 **Status:** ready-for-agent
 
-- [ ] A stub that runs past 5 seconds is killed, and the verdict is the bash block's `error` level
-- [ ] A stub that returns an error for one command gives the `error` level with the engine's message as the reason
-- [ ] The next command after a failure is evaluated normally
-- [ ] The timeout test waits the full 5 seconds
+- [x] A stub that runs past 5 seconds is killed, and the verdict is the bash block's `error` level
+- [x] A stub that returns an error for one command gives the `error` level with the engine's message as the reason
+- [x] The next command after a failure is evaluated normally
+- [x] The timeout test waits the full 5 seconds
