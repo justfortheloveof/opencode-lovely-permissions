@@ -6,8 +6,8 @@
 
 **Status:** ready-for-agent
 
-- [ ] Setup sends the bash block to the engine's validate operation
-- [ ] An unknown key denies every shell call, naming the key and listing the valid keys
-- [ ] A bad level value denies every shell call, naming the key
-- [ ] A valid policy leaves the plugin unblocked, and evaluations proceed
-- [ ] The blocked-state denial uses the auto-rejected label and the closing sentence
+- [x] Setup sends the bash block to the engine's validate operation
+- [x] An unknown key denies every shell call, naming the key and listing the valid keys
+- [x] A bad level value denies every shell call, naming the key
+- [x] A valid policy leaves the plugin unblocked, and evaluations proceed
+- [x] The blocked-state denial uses the auto-rejected label and the closing sentence

@@ -4,15 +4,10 @@ import { commandFor, forgetCommand, recordCommand } from "./command-capture.ts";
 import { EngineError, evaluate, type Verdict } from "./engine-client.ts";
 import { resolveEngine } from "./engine.ts";
 import { fallbackLevel } from "./fallback.ts";
-import {
-  askMessage,
-  denyMessage,
-  ENGINE_NOT_FOUND_REASON,
-  invalidPolicyReason,
-  UNMATCHED_REASON,
-} from "./messages.ts";
-import { readLayeredPolicy } from "./policy-layers.ts";
+import { askMessage, denyMessage, UNMATCHED_REASON } from "./messages.ts";
 import { DEFAULT_MODE, type ModePolicy } from "./policy-file.ts";
+import { readLayeredPolicy } from "./policy-layers.ts";
+import { checkStartup } from "./startup.ts";
 
 const SHELL_ACTION = "shell";
 const ABSENT_POLICY: ModePolicy = { bash: {}, wildcard: "ask" };
@@ -23,17 +18,14 @@ export default Plugin.define({
     const engine = resolveEngine();
     const policy = await readLayeredPolicy(ctx.location.directory);
     const mode = policy.status === "valid" ? policy.modes[DEFAULT_MODE] : ABSENT_POLICY;
+    const startup = await checkStartup(engine, policy, mode);
 
     await ctx.tool.hook("execute.before", recordCommand);
     await ctx.tool.hook("execute.after", forgetCommand);
     await ctx.permission.hook("evaluate", async (event) => {
       if (event.action !== SHELL_ACTION) return;
-      if (engine === undefined) {
-        deny(event, denyMessage([ENGINE_NOT_FOUND_REASON]));
-        return;
-      }
-      if (policy.status === "invalid") {
-        deny(event, denyMessage([invalidPolicyReason(policy.file, policy.reason)]));
+      if (startup.status === "blocked") {
+        deny(event, startup.message);
         return;
       }
       if (event.effect === "deny") return;
@@ -42,7 +34,7 @@ export default Plugin.define({
         deny(event, denyMessage([UNMATCHED_REASON]));
         return;
       }
-      applyVerdict(event, await verdictFor(engine, command, mode));
+      applyVerdict(event, await verdictFor(startup.engine, command, mode));
     });
   },
 });

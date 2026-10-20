@@ -20,6 +20,14 @@ export function invalidPolicyReason(file: string, reason: string): string {
   return `the policy file ${file} could not be used: ${reason}. Fix the file and restart OpenCode.`;
 }
 
+export function rejectedPolicyReason(error: string): string {
+  return `the bash engine rejected the policy: ${error}. Fix what it names, then restart OpenCode.`;
+}
+
+export function engineUnusableReason(detail: string): string {
+  return `the bash engine could not check the policy: ${detail}. Reinstall it with \`uv tool install lovely-bash-permissions\`, or set ${ENGINE_OVERRIDE} to a working engine binary, then restart OpenCode.`;
+}
+
 export const ENGINE_NOT_FOUND_REASON = `${ENGINE_BINARY} was not found. Install it with \`uv tool install lovely-bash-permissions\`, or set ${ENGINE_OVERRIDE} to the path of an existing engine binary.`;
 
 export function unknownModeReason(mode: string, modes: readonly string[]): string {

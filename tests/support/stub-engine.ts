@@ -7,8 +7,8 @@ export interface StubEngine {
   readonly path: string;
   /** Every request the stub has read, in the order it read them. Its length is the invocation count. */
   requests(): Record<string, unknown>[];
-  /** The process ID of every run, in order, so a test can check that a run was killed. */
-  pids(): number[];
+  /** The process ID of every run that was given NEVER_ANSWERS, so a test can check the plugin killed it. */
+  hung(): number[];
 }
 
 /** A reply that is never written. The stub reads the request and then waits, so only the plugin can end the run. */
@@ -33,7 +33,7 @@ export function stubEngine(
   const dir = mkdtempSync(join(sandboxRoot, "engine-"));
   const path = join(dir, "lovely-pi-bash-permissions");
   const record = join(dir, "requests.jsonl");
-  const pids = join(dir, "pids.txt");
+  const hung = join(dir, "hung.txt");
   const outputs = {
     fallback: render(reply),
     byCommand: Object.fromEntries(
@@ -52,9 +52,12 @@ export function stubEngine(
       `process.stdin.on("end", () => {`,
       `  const request = JSON.parse(input);`,
       `  appendFileSync(${JSON.stringify(record)}, JSON.stringify(request) + "\\n");`,
-      `  appendFileSync(${JSON.stringify(pids)}, process.pid + "\\n");`,
       `  const output = Object.hasOwn(outputs.byCommand, request.command) ? outputs.byCommand[request.command] : outputs.fallback;`,
-      `  if (output === null) { setTimeout(() => {}, 30000); return; }`,
+      `  if (output === null) {`,
+      `    appendFileSync(${JSON.stringify(hung)}, process.pid + "\\n");`,
+      `    setTimeout(() => {}, 30000);`,
+      `    return;`,
+      `  }`,
       `  process.stdout.write(output);`,
       `});`,
     ].join("\n"),
@@ -63,7 +66,7 @@ export function stubEngine(
   return {
     path,
     requests: () => readLines(record).map((line) => JSON.parse(line) as Record<string, unknown>),
-    pids: () => readLines(pids).map(Number),
+    hung: () => readLines(hung).map(Number),
   };
 }
 

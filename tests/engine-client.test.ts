@@ -1,6 +1,6 @@
 import { join } from "node:path";
 import { describe, expect, test } from "vite-plus/test";
-import { EngineError, evaluate } from "../src/engine-client.ts";
+import { EngineError, evaluate, validate } from "../src/engine-client.ts";
 import { sandboxRoot } from "./support/sandbox.ts";
 import { stubEngine } from "./support/stub-engine.ts";
 
@@ -90,5 +90,40 @@ describe("evaluate", () => {
     await expect(
       evaluate(missing, { command: "git status", bash: BASH, topLevel: "ask" }),
     ).rejects.toThrow(EngineError);
+  });
+});
+
+describe("validate", () => {
+  test("sends the bash block as a validate request", async () => {
+    const engine = stubEngine({ protocol: 1, valid: true });
+    await validate(engine.path, BASH);
+    expect(engine.requests()).toEqual([{ op: "validate", config: BASH }]);
+  });
+
+  test("resolves valid when the engine accepts the block", async () => {
+    const engine = stubEngine({ protocol: 1, valid: true });
+    await expect(validate(engine.path, BASH)).resolves.toEqual({ valid: true });
+  });
+
+  test("returns the engine's message when it rejects the block", async () => {
+    const engine = stubEngine({
+      protocol: 1,
+      valid: false,
+      error: "*: Input should be 'allow', 'deny' or 'ask' (got 'alow')",
+    });
+    await expect(validate(engine.path, { "*": "alow" })).resolves.toEqual({
+      valid: false,
+      error: "*: Input should be 'allow', 'deny' or 'ask' (got 'alow')",
+    });
+  });
+
+  test("rejects a response whose protocol is not 1, rather than returning a result", async () => {
+    const engine = stubEngine({ protocol: 2, valid: true });
+    await expect(validate(engine.path, BASH)).rejects.toThrow(/protocol/);
+  });
+
+  test("rejects an answer with no validation result", async () => {
+    const engine = stubEngine({ protocol: 1 });
+    await expect(validate(engine.path, BASH)).rejects.toThrow(EngineError);
   });
 });
