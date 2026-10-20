@@ -1,8 +1,9 @@
 import { Plugin } from "@opencode/plugin";
 import type { PermissionEvaluation } from "@opencode/plugin/promise/permission";
 import { commandFor, forgetCommand, recordCommand } from "./command-capture.ts";
-import { evaluate, type Verdict } from "./engine-client.ts";
+import { EngineError, evaluate, type Verdict } from "./engine-client.ts";
 import { resolveEngine } from "./engine.ts";
+import { fallbackLevel } from "./fallback.ts";
 import {
   askMessage,
   denyMessage,
@@ -41,13 +42,23 @@ export default Plugin.define({
         deny(event, denyMessage([UNMATCHED_REASON]));
         return;
       }
-      applyVerdict(
-        event,
-        await evaluate(engine, { command, bash: mode.bash, topLevel: mode.wildcard }),
-      );
+      applyVerdict(event, await verdictFor(engine, command, mode));
     });
   },
 });
+
+async function verdictFor(engine: string, command: string, mode: ModePolicy): Promise<Verdict> {
+  try {
+    return await evaluate(engine, { command, bash: mode.bash, topLevel: mode.wildcard });
+  } catch (error) {
+    if (!(error instanceof EngineError)) throw error;
+    return {
+      action: fallbackLevel(mode, "error"),
+      reason: error.message,
+      reasons: [error.message],
+    };
+  }
+}
 
 function applyVerdict(event: PermissionEvaluation, verdict: Verdict): void {
   if (verdict.action === "allow") {

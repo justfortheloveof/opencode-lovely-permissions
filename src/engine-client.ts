@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
 
 const PROTOCOL_VERSION = 1;
+const TIMEOUT_MS = 5_000;
 
 export class EngineError extends Error {}
 
@@ -16,7 +17,10 @@ export interface Verdict {
   reasons: string[];
 }
 
-/** Runs the engine once for one command line. Rejects with an EngineError when it gives no verdict. */
+/**
+ * Runs the engine once for one command line. Rejects with an EngineError when it gives no
+ * verdict, including when it has not answered within the timeout, in which case it is killed.
+ */
 export function evaluate(engine: string, request: EvaluateRequest): Promise<Verdict> {
   const payload = {
     op: "evaluate",
@@ -27,17 +31,32 @@ export function evaluate(engine: string, request: EvaluateRequest): Promise<Verd
   return new Promise((resolve, reject) => {
     const child = spawn(engine, [], { stdio: ["pipe", "pipe", "pipe"] });
     let stdout = "";
+    let timedOut = false;
+    const timer = setTimeout(() => {
+      timedOut = true;
+      child.kill("SIGKILL");
+    }, TIMEOUT_MS);
     child.stdout.setEncoding("utf8");
     child.stdout.on("data", (chunk: string) => {
       stdout += chunk;
     });
     child.on("error", (error) => {
+      clearTimeout(timer);
       reject(new EngineError(`the engine could not be started: ${error.message}`));
     });
     child.stdin.on("error", () => {
       // A failed write means the engine went away. The error or close event reports why.
     });
     child.on("close", () => {
+      clearTimeout(timer);
+      if (timedOut) {
+        reject(
+          new EngineError(
+            `the engine did not answer this command within ${TIMEOUT_MS / 1000} seconds`,
+          ),
+        );
+        return;
+      }
       try {
         resolve(verdictFrom(stdout));
       } catch (error) {
