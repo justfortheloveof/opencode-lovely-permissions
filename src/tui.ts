@@ -10,8 +10,12 @@ export default Plugin.define({
       render: ({ sessionID }) => {
         return jsx("text", {
           get children() {
-            const asks = context.data.session.permission.list(sessionID) ?? [];
-            return pickAskBannerMessage(asks.map(({ message }) => ({ message: message ?? "" })));
+            try {
+              const asks = context.data.session.permission.list(sessionID) ?? [];
+              return pickAskBannerMessage(asks.map(({ message }) => ({ message: message ?? "" })));
+            } catch {
+              return undefined;
+            }
           },
         });
       },

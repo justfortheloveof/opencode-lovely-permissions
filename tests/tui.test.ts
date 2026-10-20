@@ -55,4 +55,16 @@ describe("terminal plugin", () => {
     pendingPermissions.ses_viewed.shift();
     expect(renderedChildren(banner)).toBeUndefined();
   });
+
+  test("renders nothing when reading pending permissions throws", async () => {
+    const permissionsBySession = Object.defineProperty({}, "ses_broken", {
+      get() {
+        throw new Error("permission data unavailable");
+      },
+    });
+    const harness = await startTerminalPlugin(permissionsBySession);
+    const banner = harness.render({ sessionID: "ses_broken" });
+
+    expect(renderedChildren(banner)).toBeUndefined();
+  });
 });
