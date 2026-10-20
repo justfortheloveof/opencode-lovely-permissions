@@ -1,11 +1,25 @@
 import { describe, expect, test } from "vite-plus/test";
 import { startTerminalPlugin } from "./support/fake-terminal-context.ts";
 
+function renderedChildren(rendered: unknown): unknown {
+  if (rendered === null || typeof rendered !== "object" || !("props" in rendered)) {
+    return undefined;
+  }
+
+  const props = rendered.props;
+  if (props === null || typeof props !== "object" || !("children" in props)) {
+    return undefined;
+  }
+
+  return props.children;
+}
+
 describe("terminal plugin", () => {
   test("registers the session composer-top slot and reads permissions for its session", async () => {
     const harness = await startTerminalPlugin({});
 
-    harness.render({ sessionID: "ses_viewed" });
+    const banner = harness.render({ sessionID: "ses_viewed" });
+    renderedChildren(banner);
 
     expect(harness.registered).toContain("session.composer.top");
     expect(harness.permissionLookups).toEqual(["ses_viewed"]);
@@ -43,6 +57,24 @@ describe("terminal plugin", () => {
     });
   });
 
+  test("updates the banner as its pending ask is answered", async () => {
+    const firstMessage = "[♡ perms: 💛 REQUIRES-USER-APPROVAL]\n- first reason";
+    const nextMessage = "[♡ perms: 💛 REQUIRES-USER-APPROVAL]\n- next reason";
+    const pendingPermissions = {
+      ses_viewed: [{ message: firstMessage }, { message: nextMessage }],
+    };
+    const harness = await startTerminalPlugin(pendingPermissions);
+    const banner = harness.render({ sessionID: "ses_viewed" });
+
+    expect(renderedChildren(banner)).toBe(firstMessage);
+
+    pendingPermissions.ses_viewed.shift();
+    expect(renderedChildren(banner)).toBe(nextMessage);
+
+    pendingPermissions.ses_viewed.shift();
+    expect(renderedChildren(banner)).toBeUndefined();
+  });
+
   test("renders nothing when reading pending permissions throws", async () => {
     const permissionsBySession = Object.defineProperty({}, "ses_broken", {
       get() {
@@ -50,8 +82,9 @@ describe("terminal plugin", () => {
       },
     });
     const harness = await startTerminalPlugin(permissionsBySession);
+    const banner = harness.render({ sessionID: "ses_broken" });
 
-    expect(harness.render({ sessionID: "ses_broken" })).toBeNull();
+    expect(renderedChildren(banner)).toBeUndefined();
   });
 
   test("renders a subagent ask in the root session's banner", async () => {
@@ -72,10 +105,8 @@ describe("terminal plugin", () => {
       },
     );
 
-    expect(harness.render({ sessionID: "ses_root" })).toEqual({
-      type: "text",
-      props: { children: message },
-    });
+    const banner = harness.render({ sessionID: "ses_root" });
+    expect(renderedChildren(banner)).toBe(message);
     expect(harness.permissionLookups).toEqual(["ses_root", "ses_child"]);
   });
 
@@ -98,10 +129,8 @@ describe("terminal plugin", () => {
       },
     );
 
-    expect(harness.render({ sessionID: "ses_root" })).toEqual({
-      type: "text",
-      props: { children: ownMessage },
-    });
+    const banner = harness.render({ sessionID: "ses_root" });
+    expect(renderedChildren(banner)).toBe(ownMessage);
     expect(harness.permissionLookups).toEqual(["ses_root", "ses_child"]);
   });
 
@@ -126,10 +155,8 @@ describe("terminal plugin", () => {
       },
     );
 
-    expect(harness.render({ sessionID: "ses_root" })).toEqual({
-      type: "text",
-      props: { children: firstMessage },
-    });
+    const banner = harness.render({ sessionID: "ses_root" });
+    expect(renderedChildren(banner)).toBe(firstMessage);
     expect(harness.permissionLookups).toEqual(["ses_root", "ses_first", "ses_second"]);
   });
 

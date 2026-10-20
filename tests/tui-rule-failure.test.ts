@@ -14,11 +14,11 @@ describe("terminal plugin failures", () => {
     const harness = await startTerminalPlugin({
       ses_viewed: [{ message: `${ASK_LABEL}\n- a reason` }],
     });
-    let rendered: unknown;
+    const rendered = harness.render({ sessionID: "ses_viewed" });
 
-    expect(() => {
-      rendered = harness.render({ sessionID: "ses_viewed" });
-    }).not.toThrow();
-    expect(rendered).toBeNull();
+    expect(rendered).toEqual({
+      type: "text",
+      props: { children: undefined },
+    });
   });
 });

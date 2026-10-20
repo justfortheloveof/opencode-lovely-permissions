@@ -17,14 +17,23 @@ function AskBannerSlot(context: Plugin.Context, sessionID: string) {
 
     if (context.data.session.get(sessionID)?.parentID) return null;
 
-    const asks = [
-      ...(context.data.session.permission.list(sessionID) ?? []),
-      ...familySessionIDs
-        .filter((familySessionID) => familySessionID !== sessionID)
-        .flatMap((familySessionID) => context.data.session.permission.list(familySessionID) ?? []),
-    ];
-    const message = pickAskBannerMessage(asks.map(({ message }) => ({ message: message ?? "" })));
-    return message === undefined ? null : jsx("text", { children: message });
+    return jsx("text", {
+      get children() {
+        try {
+          const asks = [
+            ...(context.data.session.permission.list(sessionID) ?? []),
+            ...familySessionIDs
+              .filter((familySessionID) => familySessionID !== sessionID)
+              .flatMap(
+                (familySessionID) => context.data.session.permission.list(familySessionID) ?? [],
+              ),
+          ];
+          return pickAskBannerMessage(asks.map(({ message }) => ({ message: message ?? "" })));
+        } catch {
+          return undefined;
+        }
+      },
+    });
   } catch {
     return null;
   }
