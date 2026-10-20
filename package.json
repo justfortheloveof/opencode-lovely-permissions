@@ -20,7 +20,8 @@
     "prepare": "vp config --no-agent"
   },
   "dependencies": {
-    "@opencode/plugin": "2.0.30"
+    "@opencode/plugin": "2.0.30",
+    "jsonc-parser": "^3.3.1"
   },
   "devDependencies": {
     "@types/node": "^26.6.5",

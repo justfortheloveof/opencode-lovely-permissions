@@ -6,8 +6,8 @@
 
 **Status:** ready-for-agent
 
-- [ ] JSONC with comments and trailing commas parses
-- [ ] A file with no `default` mode is reported as invalid
-- [ ] The bash block and the top-level wildcard are returned unchanged
-- [ ] A missing file is reported as absent, distinct from invalid
-- [ ] An unparseable file is reported as invalid, not absent
+- [x] JSONC with comments and trailing commas parses
+- [x] A file with no `default` mode is reported as invalid
+- [x] The bash block and the top-level wildcard are returned unchanged
+- [x] A missing file is reported as absent, distinct from invalid
+- [x] An unparseable file is reported as invalid, not absent
