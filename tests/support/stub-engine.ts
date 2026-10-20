@@ -67,6 +67,27 @@ export function crashingEngine(code: number): StubEngine {
   return writeStub(() => [`process.exit(${code});`]);
 }
 
+/**
+ * Points the engine override at a stub that answers `reply`, with `replies` giving
+ * specific commands or bash blocks their own answers, and returns the stub.
+ */
+export function useEngine(
+  reply: StubReply,
+  replies: {
+    byCommand?: Record<string, StubReply>;
+    byConfig?: Record<string, StubReply>;
+  } = {},
+): StubEngine {
+  const engine = stubEngine(reply, replies.byCommand, replies.byConfig);
+  process.env.LOVELY_PI_BASH_PERMISSIONS_BIN = engine.path;
+  return engine;
+}
+
+/** The evaluate requests the engine received. Startup also sends validate requests, which are not counted here. */
+export function evaluations(engine: StubEngine): Record<string, unknown>[] {
+  return engine.requests().filter((request) => request.op === "evaluate");
+}
+
 function writeStub(body: (record: string, hung: string) => string[]): StubEngine {
   const dir = mkdtempSync(join(sandboxRoot, "engine-"));
   const path = join(dir, "lovely-pi-bash-permissions");

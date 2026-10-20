@@ -90,6 +90,8 @@ A mode is a named object. `bash` holds the policy for shell commands. `*` on the
 
 The bash block accepts these keys, and no others. An unknown key is rejected at startup, and the message lists the valid keys.
 
+A mode accepts only `bash` and `*`, and its `*` must be `allow`, `ask`, or `deny`. Every mode in a file is checked, so a misspelt mode key or level is rejected at startup, and the message names the key.
+
 | Key                    | Accepts                                                                                                 | Decides                                                                                   |
 | ---------------------- | ------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
 | `*`                    | a level                                                                                                 | the default for every key this bash block does not set                                    |
@@ -150,16 +152,16 @@ Your policy overrides OpenCode's own allow and ask for shell commands, in both d
 
 The plugin checks the engine and the policy when OpenCode starts. A problem found there denies every shell command, and the message names the fix. Fix the problem and restart OpenCode.
 
-| Problem                                                                  | Result                                                                                                     |
-| ------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------- |
-| Engine not found                                                         | Every shell command is denied. The message names the install command and `LOVELY_PI_BASH_PERMISSIONS_BIN`. |
-| Engine cannot start or does not answer                                   | Every shell command is denied. The message names the failure and the fix.                                  |
-| Engine answers with a different protocol version                         | Every shell command is denied. The message names the mismatch and the fix.                                 |
-| Policy file cannot be read, is not valid JSONC, or has no `default` mode | Every shell command is denied. The message names the file.                                                 |
-| Engine rejects the bash block, for example an unknown key or a bad level | Every shell command is denied. The message names the engine's error.                                       |
-| Chosen mode does not exist                                               | Every shell command is denied. The message names the mode and the modes that exist.                        |
-| No policy file in any of the three locations                             | Every shell command asks.                                                                                  |
-| The engine errors, or does not answer within 5 seconds, on one command   | That command gets the `error` level. The reason is the engine's message.                                   |
+| Problem                                                                                                                   | Result                                                                                                     |
+| ------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| Engine not found                                                                                                          | Every shell command is denied. The message names the install command and `LOVELY_PI_BASH_PERMISSIONS_BIN`. |
+| Engine cannot start or does not answer                                                                                    | Every shell command is denied. The message names the failure and the fix.                                  |
+| Engine answers with a different protocol version, at startup or on a command                                              | Every shell command is denied from then on. The message names the mismatch and the fix.                    |
+| Policy file cannot be read, is not valid JSONC, has no `default` mode, or has a mode key or `*` level that is not allowed | Every shell command is denied. The message names the file.                                                 |
+| Engine rejects the bash block, for example an unknown key or a bad level                                                  | Every shell command is denied. The message names the engine's error.                                       |
+| Chosen mode does not exist                                                                                                | Every shell command is denied. The message names the mode and the modes that exist.                        |
+| No policy file in any of the three locations                                                                              | Every shell command asks.                                                                                  |
+| The engine errors, or does not answer within 5 seconds, on one command                                                    | That command gets the `error` level. The reason is the engine's message.                                   |
 
 A failure on one command affects only that command.
 

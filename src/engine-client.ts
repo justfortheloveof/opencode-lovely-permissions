@@ -1,4 +1,6 @@
 import { spawn } from "node:child_process";
+import { isRecord } from "./json.ts";
+import { isLevel, type Level } from "./level.ts";
 
 export const PROTOCOL_VERSION = 1;
 const TIMEOUT_MS = 5_000;
@@ -17,12 +19,11 @@ export class ProtocolMismatchError extends EngineError {
 export interface EvaluateRequest {
   command: string;
   bash: Record<string, unknown>;
-  topLevel: string;
+  topLevel: Level;
 }
 
 export interface Verdict {
-  action: string;
-  reason: string;
+  action: Level;
   reasons: string[];
 }
 
@@ -105,7 +106,7 @@ function verdictFrom(answer: Record<string, unknown>): Verdict {
       typeof error === "string" ? error : "the engine answered without a verdict",
     );
   }
-  return { action, reason, reasons };
+  return { action: isLevel(action) ? action : "deny", reasons };
 }
 
 function parseAnswer(stdout: string, exit: string | undefined): Record<string, unknown> {
@@ -127,8 +128,4 @@ function noAnswer(exit: string | undefined): EngineError {
       ? "it did not answer with one JSON object"
       : `it exited ${exit} before answering`,
   );
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }

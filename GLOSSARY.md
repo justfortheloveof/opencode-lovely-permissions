@@ -5,7 +5,7 @@ A plugin that decides whether OpenCode may run each bash command, using the same
 ## Language
 
 **Verdict**:
-The engine's answer for one command line: `allow`, `ask`, or `deny`, with reasons.
+The answer for one command line: `allow`, `ask`, or `deny`, with reasons. The engine gives it, or the plugin's fallback level does when the engine fails for that command.
 _Avoid_: result, decision, block
 
 **Allow**:

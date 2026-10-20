@@ -1,17 +1,17 @@
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { afterEach, beforeEach, expect, test } from "vite-plus/test";
+import { beforeEach, afterEach, expect, test } from "vite-plus/test";
 import { selectMode } from "../src/mode.ts";
-import { readLayeredPolicy } from "../src/policy-layers.ts";
+import { restoreEnvAfterEach } from "./support/env.ts";
+import { readLayeredPolicy } from "./support/project.ts";
 
-const ENV_KEYS = ["HOME", "XDG_CONFIG_HOME", "OPENCODE_CONFIG_DIR"] as const;
+restoreEnvAfterEach(["HOME", "XDG_CONFIG_HOME", "OPENCODE_CONFIG_DIR"]);
 
 let root: string;
 let globalFile: string;
 let project: string;
 let projectFile: string;
-let savedEnv: Record<string, string | undefined>;
 
 beforeEach(async () => {
   root = await mkdtemp(join(tmpdir(), "lovely-mode-"));
@@ -19,21 +19,12 @@ beforeEach(async () => {
   project = join(root, "project");
   projectFile = join(project, ".opencode", "lovely-permissions.jsonc");
 
-  savedEnv = Object.fromEntries(ENV_KEYS.map((key) => [key, process.env[key]]));
   process.env.HOME = join(root, "home");
   process.env.XDG_CONFIG_HOME = join(root, "xdg");
   process.env.OPENCODE_CONFIG_DIR = join(root, "global");
 });
 
 afterEach(async () => {
-  for (const key of ENV_KEYS) {
-    const value = savedEnv[key];
-    if (value === undefined) {
-      delete process.env[key];
-    } else {
-      process.env[key] = value;
-    }
-  }
   await rm(root, { recursive: true, force: true });
 });
 
@@ -54,8 +45,10 @@ test("the default mode's bash block and wildcard are selected by name", async ()
   expect(selectMode(await readLayeredPolicy(project), "default")).toEqual({
     status: "valid",
     mode: "default",
-    bash: { "*": "deny", allowed_cmds_regex: ["^git\\s+status$"] },
-    wildcard: "ask",
+    policy: {
+      bash: { "*": "deny", allowed_cmds_regex: ["^git\\s+status$"] },
+      wildcard: "ask",
+    },
   });
 });
 
@@ -71,8 +64,7 @@ test("a named mode that exists selects that mode's bash block and wildcard", asy
   expect(selectMode(await readLayeredPolicy(project), "strict")).toEqual({
     status: "valid",
     mode: "strict",
-    bash: { "*": "deny", subshell: "allow" },
-    wildcard: "deny",
+    policy: { bash: { "*": "deny", subshell: "allow" }, wildcard: "deny" },
   });
 });
 
@@ -83,8 +75,7 @@ test("a mode defined only in the global file can be selected", async () => {
   expect(selectMode(await readLayeredPolicy(project), "personal")).toEqual({
     status: "valid",
     mode: "personal",
-    bash: {},
-    wildcard: "allow",
+    policy: { bash: {}, wildcard: "allow" },
   });
 });
 
@@ -97,7 +88,6 @@ test("a selected mode that does not exist is invalid, naming the mode and listin
   expect(selectMode(await readLayeredPolicy(project), "strict")).toEqual({
     status: "unknown-mode",
     mode: "strict",
-    modes: ["default", "personal"],
     reason:
       'the mode option selects "strict", but no policy file defines that mode. The modes that exist are: "default", "personal". Set the mode option to one of them, then restart OpenCode.',
   });

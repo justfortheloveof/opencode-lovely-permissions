@@ -1,14 +1,21 @@
 import { Plugin } from "@opencode/plugin";
 import type { PermissionEvaluation } from "@opencode/plugin/promise/permission";
 import { commandFor, forgetCommand, recordCommand } from "./command-capture.ts";
-import { EngineError, evaluate, type Verdict } from "./engine-client.ts";
+import { EngineError, evaluate, ProtocolMismatchError, type Verdict } from "./engine-client.ts";
 import { resolveEngine } from "./engine.ts";
 import { fallbackLevel, levelOf } from "./fallback.ts";
-import { askMessage, denyMessage, noPolicyMessage, UNMATCHED_REASON } from "./messages.ts";
+import {
+  askMessage,
+  denyMessage,
+  noPolicyMessage,
+  protocolMismatchReason,
+  UNMATCHED_REASON,
+} from "./messages.ts";
 import { selectMode } from "./mode.ts";
 import { DEFAULT_MODE, type ModePolicy } from "./policy-file.ts";
-import { bashSources, policyLocations, readLayeredPolicy } from "./policy-layers.ts";
-import { checkStartup } from "./startup.ts";
+import { policyLocations } from "./policy-locations.ts";
+import { bashSources, layeredPolicy, readLayers } from "./policy-layers.ts";
+import { checkStartup, failure } from "./startup.ts";
 
 const SHELL_ACTION = "shell";
 
@@ -18,22 +25,19 @@ export default Plugin.define({
     const engine = resolveEngine();
     const directory = ctx.location.directory;
     const mode = String(ctx.options.mode ?? DEFAULT_MODE);
-    const policy = await readLayeredPolicy(directory);
+    const locations = policyLocations(directory);
+    const layers = await readLayers(locations);
+    const policy = layeredPolicy(layers);
     if (policy.status === "valid") {
       for (const warning of policy.warnings) console.warn(warning);
     }
-    const startup = await checkStartup(
-      engine,
-      selectMode(policy, mode),
-      await bashSources(directory, mode),
-    );
-    const locations = policyLocations(directory);
+    let startup = await checkStartup(engine, selectMode(policy, mode), bashSources(layers, mode));
 
     await ctx.tool.hook("execute.before", recordCommand);
     await ctx.tool.hook("execute.after", forgetCommand);
     await ctx.permission.hook("evaluate", async (event) => {
       if (event.action !== SHELL_ACTION) return;
-      if (startup.status === "blocked") {
+      if (startup.status === "failed") {
         deny(event, startup.message);
         return;
       }
@@ -48,7 +52,13 @@ export default Plugin.define({
         deny(event, denyMessage([UNMATCHED_REASON]));
         return;
       }
-      applyVerdict(event, await verdictFor(startup.engine, command, startup.mode));
+      try {
+        applyVerdict(event, await verdictFor(startup.engine, command, startup.mode));
+      } catch (error) {
+        if (!(error instanceof ProtocolMismatchError)) throw error;
+        startup = failure(protocolMismatchReason(error.found));
+        deny(event, startup.message);
+      }
     });
   },
 });
@@ -61,10 +71,10 @@ async function verdictFor(engine: string, command: string, mode: ModePolicy): Pr
       topLevel: levelOf(mode.wildcard),
     });
   } catch (error) {
-    if (!(error instanceof EngineError)) throw error;
+    // A protocol mismatch is not a per-command error: it fails the plugin instead.
+    if (!(error instanceof EngineError) || error instanceof ProtocolMismatchError) throw error;
     return {
       action: fallbackLevel(mode, "error"),
-      reason: error.message,
       reasons: [error.message],
     };
   }

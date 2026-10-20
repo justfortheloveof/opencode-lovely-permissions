@@ -101,3 +101,19 @@ export async function startPlugin(
     },
   };
 }
+
+/** Starts a shell call for the command, then runs the permission hook on it with OpenCode's own effect. */
+export async function judge(
+  harness: PluginHarness,
+  id: string,
+  command: string,
+  effect: PermissionRequest["effect"] = "allow",
+): Promise<PermissionDecision> {
+  await harness.startCall({ tool: "shell", id, input: { command } });
+  return harness.evaluate({
+    action: "shell",
+    resources: [command],
+    effect,
+    source: { type: "tool", messageID: "msg_test", id },
+  });
+}

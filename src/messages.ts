@@ -5,6 +5,9 @@ export const ASK_LABEL = "[♡ perms: 💛 REQUIRES-USER-APPROVAL]";
 export const DENY_LABEL = "[♡ perms: ❤️ auto-rejected]";
 export const NOT_RUN = "The tool has not been run.";
 
+/** The closing sentence as the engine writes it, which has no full stop. */
+const ENGINE_NOT_RUN = /\s*The tool has not been run\.?$/;
+
 export const UNMATCHED_REASON = "the command could not be matched to its tool call";
 
 /** An ask: the label, then one bullet per reason. */
@@ -12,9 +15,16 @@ export function askMessage(reasons: readonly string[]): string {
   return [ASK_LABEL, ...bullets(reasons)].join("\n");
 }
 
-/** A deny: the label, one bullet per reason, then the closing sentence. */
+/**
+ * A deny: the label, one bullet per reason, then the closing sentence. The engine's own
+ * reasons may end with that sentence, so it is taken off them and the closing line is
+ * the only copy.
+ */
 export function denyMessage(reasons: readonly string[]): string {
-  return [DENY_LABEL, ...bullets(reasons), NOT_RUN].join("\n");
+  const bare = reasons
+    .map((reason) => reason.replace(ENGINE_NOT_RUN, ""))
+    .filter((reason) => reason !== "");
+  return [DENY_LABEL, ...bullets(bare), NOT_RUN].join("\n");
 }
 
 export function invalidPolicyReason(file: string, reason: string): string {

@@ -1,6 +1,6 @@
 import { join } from "node:path";
 import { describe, expect, test } from "vite-plus/test";
-import { EngineError, evaluate, validate } from "../src/engine-client.ts";
+import { EngineError, evaluate, validate, type EvaluateRequest } from "../src/engine-client.ts";
 import { sandboxRoot } from "./support/sandbox.ts";
 import { stubEngine } from "./support/stub-engine.ts";
 
@@ -27,7 +27,7 @@ describe("evaluate", () => {
     ]);
   });
 
-  test("returns the action, reason, and reasons as the engine sent them", async () => {
+  test("returns the action and reasons as the engine sent them", async () => {
     const engine = stubEngine({
       protocol: 1,
       action: "ask",
@@ -38,7 +38,6 @@ describe("evaluate", () => {
       evaluate(engine.path, { command: "rm -rf /", bash: BASH, topLevel: "ask" }),
     ).resolves.toEqual({
       action: "ask",
-      reason: "first reason; second reason",
       reasons: ["first reason", "second reason"],
     });
   });
@@ -69,7 +68,7 @@ describe("evaluate", () => {
 
   test("starts the engine once per call", async () => {
     const engine = stubEngine(ALLOW);
-    const request = { command: "git status", bash: BASH, topLevel: "ask" };
+    const request: EvaluateRequest = { command: "git status", bash: BASH, topLevel: "ask" };
     await evaluate(engine.path, request);
     await evaluate(engine.path, request);
     expect(engine.requests()).toHaveLength(2);

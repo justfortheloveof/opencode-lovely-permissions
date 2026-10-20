@@ -1,59 +1,25 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync } from "node:fs";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, test } from "vite-plus/test";
-import { startPlugin, type PermissionRequest, type PluginHarness } from "./support/fake-context.ts";
+import { beforeEach, describe, expect, test } from "vite-plus/test";
+import { judge, startPlugin } from "./support/fake-context.ts";
+import { restoreEnvAfterEach } from "./support/env.ts";
+import { projectWith } from "./support/project.ts";
 import { sandboxRoot } from "./support/sandbox.ts";
-import {
-  NEVER_ANSWERS,
-  stubEngine,
-  type StubEngine,
-  type StubReply,
-} from "./support/stub-engine.ts";
-
-type Effect = PermissionRequest["effect"];
+import { evaluations, NEVER_ANSWERS, useEngine } from "./support/stub-engine.ts";
 
 const ALLOW_REASONS = ["command matches allowed pattern: ^git\\s+status$"];
 const ASK_REASONS = ["the command matches no allowed pattern", "it writes to a file"];
 const DENY_REASONS = ["the command matches a blocked pattern", "it reads /etc/passwd"];
-const VALID_POLICY = JSON.stringify({ default: { bash: {} } });
+const VALID_POLICY = { default: { bash: {} } };
 
 function verdict(action: string, reasons: string[]) {
   return { protocol: 1, valid: true, action, reason: reasons.join("; "), reasons };
 }
 
-function engineAnswering(response: StubReply, byCommand?: Record<string, StubReply>) {
-  const engine = stubEngine(response, byCommand);
-  process.env.LOVELY_PI_BASH_PERMISSIONS_BIN = engine.path;
-  return engine;
-}
-
-/** The evaluate requests the engine received. Startup also sends one validate request, which is not counted here. */
-function evaluations(engine: StubEngine) {
-  return engine.requests().filter((request) => request.op === "evaluate");
-}
-
-function projectWithPolicy(policy: string): string {
-  const directory = mkdtempSync(join(sandboxRoot, "project-"));
-  mkdirSync(join(directory, ".opencode"));
-  writeFileSync(join(directory, ".opencode", "lovely-permissions.jsonc"), policy);
-  return directory;
-}
-
-/** Starts a shell call for the command, then runs the permission hook on it with OpenCode's own effect. */
-async function judge(harness: PluginHarness, id: string, command: string, effect: Effect) {
-  await harness.startCall({ tool: "shell", id, input: { command } });
-  return harness.evaluate({
-    action: "shell",
-    resources: [command],
-    effect,
-    source: { type: "tool", messageID: "msg_test", id },
-  });
-}
-
 describe("allow", () => {
   test("an allow verdict sets the allow effect and no message", async () => {
-    engineAnswering(verdict("allow", ALLOW_REASONS));
-    const harness = await startPlugin(projectWithPolicy(VALID_POLICY));
+    useEngine(verdict("allow", ALLOW_REASONS));
+    const harness = await startPlugin(projectWith(VALID_POLICY));
     expect(await judge(harness, "call_allow", "git status", "allow")).toEqual({
       effect: "allow",
       message: undefined,
@@ -61,8 +27,8 @@ describe("allow", () => {
   });
 
   test("an allow verdict replaces OpenCode's ask", async () => {
-    engineAnswering(verdict("allow", ALLOW_REASONS));
-    const harness = await startPlugin(projectWithPolicy(VALID_POLICY));
+    useEngine(verdict("allow", ALLOW_REASONS));
+    const harness = await startPlugin(projectWith(VALID_POLICY));
     expect(await judge(harness, "call_allow_over_ask", "git status", "ask")).toEqual({
       effect: "allow",
       message: undefined,
@@ -72,8 +38,8 @@ describe("allow", () => {
 
 describe("ask", () => {
   test("an ask verdict sets the ask effect, the ask label, and one bullet per reason in the engine's order", async () => {
-    engineAnswering(verdict("ask", ASK_REASONS));
-    const harness = await startPlugin(projectWithPolicy(VALID_POLICY));
+    useEngine(verdict("ask", ASK_REASONS));
+    const harness = await startPlugin(projectWith(VALID_POLICY));
     expect(await judge(harness, "call_ask", "cat notes > out.txt", "allow")).toEqual({
       effect: "ask",
       message:
@@ -84,8 +50,8 @@ describe("ask", () => {
 
 describe("deny", () => {
   test("a deny verdict sets the deny effect, the deny label, one bullet per reason, and the closing sentence", async () => {
-    engineAnswering(verdict("deny", DENY_REASONS));
-    const harness = await startPlugin(projectWithPolicy(VALID_POLICY));
+    useEngine(verdict("deny", DENY_REASONS));
+    const harness = await startPlugin(projectWith(VALID_POLICY));
     expect(await judge(harness, "call_deny", "cat /etc/passwd", "allow")).toEqual({
       effect: "deny",
       message:
@@ -94,20 +60,42 @@ describe("deny", () => {
   });
 
   test("a deny verdict replaces OpenCode's ask", async () => {
-    engineAnswering(verdict("deny", DENY_REASONS));
-    const harness = await startPlugin(projectWithPolicy(VALID_POLICY));
+    useEngine(verdict("deny", DENY_REASONS));
+    const harness = await startPlugin(projectWith(VALID_POLICY));
     expect(await judge(harness, "call_deny_over_ask", "cat /etc/passwd", "ask")).toEqual({
       effect: "deny",
       message:
         "[♡ perms: ❤️ auto-rejected]\n- the command matches a blocked pattern\n- it reads /etc/passwd\nThe tool has not been run.",
     });
   });
+
+  test("a reason that already ends with the closing sentence shows that sentence once, at the end", async () => {
+    const blocked =
+      'Blocked by bash permissions: Argument "/etc/passwd" matches blocked pattern /etc/. The tool has not been run';
+    useEngine(verdict("deny", [blocked, "it reads /etc/passwd"]));
+    const harness = await startPlugin(projectWith(VALID_POLICY));
+    expect(await judge(harness, "call_deny_engine_sentence", "cat /etc/passwd", "allow")).toEqual({
+      effect: "deny",
+      message:
+        '[♡ perms: ❤️ auto-rejected]\n- Blocked by bash permissions: Argument "/etc/passwd" matches blocked pattern /etc/.\n- it reads /etc/passwd\nThe tool has not been run.',
+    });
+  });
+
+  test("an action that is not a level is applied as a deny", async () => {
+    useEngine(verdict("maybe", ASK_REASONS));
+    const harness = await startPlugin(projectWith(VALID_POLICY));
+    expect(await judge(harness, "call_unknown_action", "git status", "allow")).toEqual({
+      effect: "deny",
+      message:
+        "[♡ perms: ❤️ auto-rejected]\n- the command matches no allowed pattern\n- it writes to a file\nThe tool has not been run.",
+    });
+  });
 });
 
 describe("OpenCode's explicit deny", () => {
   test("is not replaced by an allow verdict", async () => {
-    engineAnswering(verdict("allow", ALLOW_REASONS));
-    const harness = await startPlugin(projectWithPolicy(VALID_POLICY));
+    useEngine(verdict("allow", ALLOW_REASONS));
+    const harness = await startPlugin(projectWith(VALID_POLICY));
     expect(await judge(harness, "call_explicit_deny", "git status", "deny")).toEqual({
       effect: "deny",
       message: undefined,
@@ -117,15 +105,13 @@ describe("OpenCode's explicit deny", () => {
 
 describe("the engine request", () => {
   test("gets the whole command line as captured, with the bash block and the mode's wildcard unchanged", async () => {
-    const engine = engineAnswering(verdict("allow", ALLOW_REASONS));
+    const engine = useEngine(verdict("allow", ALLOW_REASONS));
     const bash = {
       "*": "deny",
       allowed_cmds_regex: ["^git\\s+status$"],
       output_redirection: { "*": "ask", stdout_to_dev_null: "allow" },
     };
-    const harness = await startPlugin(
-      projectWithPolicy(JSON.stringify({ default: { "*": "allow", bash } })),
-    );
+    const harness = await startPlugin(projectWith({ default: { "*": "allow", bash } }));
     const command = "echo hi | cat > out.txt && git status ";
     await judge(harness, "call_request", command, "ask");
     expect(engine.requests()).toEqual([
@@ -138,15 +124,12 @@ describe("the engine request", () => {
   test.each([
     ["has no * of its own", {}, "ask"],
     ["sets * to deny", { "*": "deny" }, "deny"],
-    ["sets * to something that is not a level", { "*": "alow" }, "ask"],
   ])(
-    "sends the mode's * as the top level when it is a level, and ask otherwise: a mode that %s",
+    "sends the mode's * as the top level when it has one, and ask otherwise: a mode that %s",
     async (_, wildcard, topLevel) => {
-      const engine = engineAnswering(verdict("allow", ALLOW_REASONS));
+      const engine = useEngine(verdict("allow", ALLOW_REASONS));
       const bash = { allowed_cmds_regex: ["^git\\s+status$"] };
-      const harness = await startPlugin(
-        projectWithPolicy(JSON.stringify({ default: { ...wildcard, bash } })),
-      );
+      const harness = await startPlugin(projectWith({ default: { ...wildcard, bash } }));
       await judge(harness, "call_top_level", "git status", "ask");
       expect(evaluations(engine)).toEqual([
         { op: "evaluate", command: "git status", config: bash, top_level: topLevel },
@@ -155,7 +138,7 @@ describe("the engine request", () => {
   );
 
   test("with no policy file, setup checks the engine with an empty bash block, and a shell call is not sent to it", async () => {
-    const engine = engineAnswering(verdict("ask", ASK_REASONS));
+    const engine = useEngine(verdict("ask", ASK_REASONS));
     const harness = await startPlugin();
     await judge(harness, "call_no_policy", "git status", "allow");
     expect(engine.requests()).toEqual([{ op: "validate", config: {} }]);
@@ -164,8 +147,8 @@ describe("the engine request", () => {
 
 describe("an invalid policy file", () => {
   test("denies every shell call, naming the file, without asking the engine", async () => {
-    const engine = engineAnswering(verdict("allow", ALLOW_REASONS));
-    const project = projectWithPolicy(JSON.stringify({ strict: { "*": "allow" } }));
+    const engine = useEngine(verdict("allow", ALLOW_REASONS));
+    const project = projectWith({ strict: { "*": "allow" } });
     const file = join(project, ".opencode", "lovely-permissions.jsonc");
     const harness = await startPlugin(project);
     expect(await judge(harness, "call_invalid_policy", "git status", "allow")).toEqual({
@@ -177,20 +160,16 @@ describe("an invalid policy file", () => {
 });
 
 describe("with no policy file", () => {
+  restoreEnvAfterEach(["HOME", "XDG_CONFIG_HOME", "OPENCODE_CONFIG_DIR"]);
+
   let project: string;
   let expected: string;
-  let saved: Record<string, string | undefined>;
 
   beforeEach(() => {
     const root = mkdtempSync(join(sandboxRoot, "no-policy-"));
     const globalDir = join(root, "global");
     project = join(root, "project");
     mkdirSync(project);
-    saved = {
-      HOME: process.env.HOME,
-      XDG_CONFIG_HOME: process.env.XDG_CONFIG_HOME,
-      OPENCODE_CONFIG_DIR: process.env.OPENCODE_CONFIG_DIR,
-    };
     process.env.HOME = join(root, "home");
     process.env.XDG_CONFIG_HOME = join(root, "xdg");
     process.env.OPENCODE_CONFIG_DIR = globalDir;
@@ -202,15 +181,8 @@ describe("with no policy file", () => {
     ].join("\n");
   });
 
-  afterEach(() => {
-    for (const [key, value] of Object.entries(saved)) {
-      if (value === undefined) delete process.env[key];
-      else process.env[key] = value;
-    }
-  });
-
   test("every shell call asks, naming the three expected locations, whatever OpenCode's effect", async () => {
-    engineAnswering(verdict("allow", ALLOW_REASONS));
+    useEngine(verdict("allow", ALLOW_REASONS));
     const harness = await startPlugin(project);
     await expect(judge(harness, "call_no_policy_allow", "git status", "allow")).resolves.toEqual({
       effect: "ask",
@@ -223,14 +195,14 @@ describe("with no policy file", () => {
   });
 
   test("the engine is not asked for a verdict", async () => {
-    const engine = engineAnswering(verdict("allow", ALLOW_REASONS));
+    const engine = useEngine(verdict("allow", ALLOW_REASONS));
     const harness = await startPlugin(project);
     await judge(harness, "call_no_policy_engine", "git status", "allow");
     expect(evaluations(engine)).toEqual([]);
   });
 
   test("OpenCode's explicit deny still stands", async () => {
-    engineAnswering(verdict("allow", ALLOW_REASONS));
+    useEngine(verdict("allow", ALLOW_REASONS));
     const harness = await startPlugin(project);
     expect(await judge(harness, "call_no_policy_deny", "git status", "deny")).toEqual({
       effect: "deny",
@@ -239,7 +211,7 @@ describe("with no policy file", () => {
   });
 
   test("a shell call with no captured command still asks", async () => {
-    engineAnswering(verdict("allow", ALLOW_REASONS));
+    useEngine(verdict("allow", ALLOW_REASONS));
     const harness = await startPlugin(project);
     await expect(
       harness.evaluate({
@@ -254,8 +226,8 @@ describe("with no policy file", () => {
 
 describe("a shell call with no captured command", () => {
   test("is denied as unmatched, without asking the engine for a verdict", async () => {
-    const engine = engineAnswering(verdict("allow", ALLOW_REASONS));
-    const harness = await startPlugin(projectWithPolicy(VALID_POLICY));
+    const engine = useEngine(verdict("allow", ALLOW_REASONS));
+    const harness = await startPlugin(projectWith(VALID_POLICY));
     expect(
       await harness.evaluate({
         action: "shell",
@@ -304,8 +276,10 @@ describe("an engine error for one command", () => {
       { effect: "allow", message: undefined },
     ],
   ])("%s", async (_, mode, expected) => {
-    const engine = engineAnswering(verdict("allow", ALLOW_REASONS), { "rm -rf /": ENGINE_FAILURE });
-    const harness = await startPlugin(projectWithPolicy(JSON.stringify({ default: mode })));
+    const engine = useEngine(verdict("allow", ALLOW_REASONS), {
+      byCommand: { "rm -rf /": ENGINE_FAILURE },
+    });
+    const harness = await startPlugin(projectWith({ default: mode }));
     expect(await judge(harness, "call_engine_error", "rm -rf /", "allow")).toEqual(expected);
     expect(evaluations(engine)).toHaveLength(1);
   });
@@ -313,9 +287,9 @@ describe("an engine error for one command", () => {
   test("a parse failure the engine answers as a verdict is applied as the engine gave it", async () => {
     const reason =
       "error evaluating command (policy 'deny'): Failed to parse: 1:4: `((` can only be used to open an arithmetic cmd";
-    engineAnswering(verdict("deny", [reason]));
+    useEngine(verdict("deny", [reason]));
     const harness = await startPlugin(
-      projectWithPolicy(JSON.stringify({ default: { "*": "ask", bash: { error: "deny" } } })),
+      projectWith({ default: { "*": "ask", bash: { error: "deny" } } }),
     );
     expect(await judge(harness, "call_parse_failure", "((", "allow")).toEqual({
       effect: "deny",
@@ -324,9 +298,11 @@ describe("an engine error for one command", () => {
   });
 
   test("the next command after the failure is evaluated normally", async () => {
-    const engine = engineAnswering(verdict("allow", ALLOW_REASONS), { "rm -rf /": ENGINE_FAILURE });
+    const engine = useEngine(verdict("allow", ALLOW_REASONS), {
+      byCommand: { "rm -rf /": ENGINE_FAILURE },
+    });
     const harness = await startPlugin(
-      projectWithPolicy(JSON.stringify({ default: { "*": "ask", bash: { error: "deny" } } })),
+      projectWith({ default: { "*": "ask", bash: { error: "deny" } } }),
     );
     expect(await judge(harness, "call_failed_first", "rm -rf /", "allow")).toEqual({
       effect: "deny",
@@ -348,11 +324,11 @@ describe("an engine that does not answer within 5 seconds", () => {
     "[♡ perms: ❤️ auto-rejected]\n- the engine did not answer within 5 seconds\nThe tool has not been run.";
 
   test("is killed, and the command takes the bash block's error level", async () => {
-    const engine = engineAnswering(verdict("allow", ALLOW_REASONS), { "sleep 100": NEVER_ANSWERS });
+    const engine = useEngine(verdict("allow", ALLOW_REASONS), {
+      byCommand: { "sleep 100": NEVER_ANSWERS },
+    });
     const harness = await startPlugin(
-      projectWithPolicy(
-        JSON.stringify({ default: { "*": "allow", bash: { "*": "allow", error: "deny" } } }),
-      ),
+      projectWith({ default: { "*": "allow", bash: { "*": "allow", error: "deny" } } }),
     );
     expect(await judge(harness, "call_timeout", "sleep 100", "allow")).toEqual({
       effect: "deny",
@@ -371,9 +347,9 @@ describe("an engine that does not answer within 5 seconds", () => {
   }, 15_000);
 
   test("the next command after the timeout is evaluated normally", async () => {
-    engineAnswering(verdict("allow", ALLOW_REASONS), { "sleep 100": NEVER_ANSWERS });
+    useEngine(verdict("allow", ALLOW_REASONS), { byCommand: { "sleep 100": NEVER_ANSWERS } });
     const harness = await startPlugin(
-      projectWithPolicy(JSON.stringify({ default: { "*": "ask", bash: { error: "deny" } } })),
+      projectWith({ default: { "*": "ask", bash: { error: "deny" } } }),
     );
     expect(await judge(harness, "call_timed_out", "sleep 100", "allow")).toEqual({
       effect: "deny",

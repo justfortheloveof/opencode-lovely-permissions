@@ -2,9 +2,11 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, beforeEach, expect, test } from "vite-plus/test";
-import { policyLocations, readLayeredPolicy } from "../src/policy-layers.ts";
+import { policyLocations } from "../src/policy-locations.ts";
+import { restoreEnvAfterEach } from "./support/env.ts";
+import { readLayeredPolicy } from "./support/project.ts";
 
-const ENV_KEYS = ["HOME", "XDG_CONFIG_HOME", "OPENCODE_CONFIG_DIR"] as const;
+restoreEnvAfterEach(["HOME", "XDG_CONFIG_HOME", "OPENCODE_CONFIG_DIR"]);
 
 let root: string;
 let globalDir: string;
@@ -14,7 +16,6 @@ let homeGlobalFile: string;
 let project: string;
 let projectFile: string;
 let localFile: string;
-let savedEnv: Record<string, string | undefined>;
 
 beforeEach(async () => {
   root = await mkdtemp(join(tmpdir(), "lovely-layers-"));
@@ -26,21 +27,12 @@ beforeEach(async () => {
   projectFile = join(project, ".opencode", "lovely-permissions.jsonc");
   localFile = join(project, ".opencode", "lovely-permissions.local.jsonc");
 
-  savedEnv = Object.fromEntries(ENV_KEYS.map((key) => [key, process.env[key]]));
   process.env.HOME = join(root, "home");
   process.env.XDG_CONFIG_HOME = join(root, "xdg");
   process.env.OPENCODE_CONFIG_DIR = globalDir;
 });
 
 afterEach(async () => {
-  for (const key of ENV_KEYS) {
-    const value = savedEnv[key];
-    if (value === undefined) {
-      delete process.env[key];
-    } else {
-      process.env[key] = value;
-    }
-  }
   await rm(root, { recursive: true, force: true });
 });
 
@@ -200,6 +192,187 @@ test("no policy file at all is absent", async () => {
   expect(await readLayeredPolicy(project)).toEqual({ status: "absent" });
 });
 
+test("a missing file is absent when the .opencode directory exists", async () => {
+  await mkdir(join(project, ".opencode"), { recursive: true });
+
+  expect(await readLayeredPolicy(project)).toEqual({ status: "absent" });
+});
+
+test("a file with comments and trailing commas is read", async () => {
+  await writeAt(
+    projectFile,
+    `// Team rules for this repository
+{
+  /* the mode every session uses */
+  "default": {
+    "*": "ask",
+    "bash": {
+      "*": "ask",
+      "allowed_cmds_regex": [
+        "^git\\\\s+status$", // read-only
+        "^ls\\\\b",
+      ],
+    },
+  },
+}
+`,
+  );
+
+  expect(await readLayeredPolicy(project)).toEqual({
+    status: "valid",
+    modes: {
+      default: {
+        bash: { "*": "ask", allowed_cmds_regex: ["^git\\s+status$", "^ls\\b"] },
+        wildcard: "ask",
+      },
+    },
+    warnings: [],
+  });
+});
+
+test("the bash block and the top-level wildcard are returned unchanged", async () => {
+  await writeAt(
+    projectFile,
+    JSON.stringify({
+      default: {
+        "*": "deny",
+        bash: {
+          "*": "ask",
+          error: "deny",
+          allowed_cmds_regex: ["^git\\s+status$"],
+          blocked_cmds_regex: ["/etc/passwd"],
+          output_redirection: { "*": "ask", stdout_to_dev_null: "allow" },
+          subshell: "deny",
+        },
+      },
+      strict: { "*": "deny" },
+    }),
+  );
+
+  expect(await readLayeredPolicy(project)).toEqual({
+    status: "valid",
+    modes: {
+      default: {
+        bash: {
+          "*": "ask",
+          error: "deny",
+          allowed_cmds_regex: ["^git\\s+status$"],
+          blocked_cmds_regex: ["/etc/passwd"],
+          output_redirection: { "*": "ask", stdout_to_dev_null: "allow" },
+          subshell: "deny",
+        },
+        wildcard: "deny",
+      },
+      strict: { bash: {}, wildcard: "deny" },
+    },
+    warnings: [],
+  });
+});
+
+test("a default mode without a bash block gets an empty bash block and no wildcard", async () => {
+  await writeAt(projectFile, `{ "default": { } }`);
+
+  expect(await readLayeredPolicy(project)).toEqual({
+    status: "valid",
+    modes: { default: { bash: {}, wildcard: undefined } },
+    warnings: [],
+  });
+});
+
+test("a project file with no default mode is invalid, and the file is named", async () => {
+  await writeAt(projectFile, `{ "strict": { "*": "deny", "bash": { "*": "deny" } } }`);
+
+  expect(await readLayeredPolicy(project)).toEqual({
+    status: "invalid",
+    file: projectFile,
+    reason: 'it has no "default" mode',
+  });
+});
+
+test("a default mode that is not an object is invalid", async () => {
+  await writeAt(projectFile, `{ "default": "ask" }`);
+
+  expect(await readLayeredPolicy(project)).toEqual({
+    status: "invalid",
+    file: projectFile,
+    reason: 'the "default" mode is not an object',
+  });
+});
+
+test("a bash block that is not an object is invalid", async () => {
+  await writeAt(projectFile, `{ "default": { "bash": "deny" } }`);
+
+  expect(await readLayeredPolicy(project)).toEqual({
+    status: "invalid",
+    file: projectFile,
+    reason: 'the "bash" block of the "default" mode is not an object',
+  });
+});
+
+test("a file whose top level is not an object is invalid", async () => {
+  await writeAt(projectFile, `[{ "default": {} }]`);
+
+  expect(await readLayeredPolicy(project)).toEqual({
+    status: "invalid",
+    file: projectFile,
+    reason: "it does not hold an object of modes",
+  });
+});
+
+test("an unparseable file is invalid, not absent", async () => {
+  await writeAt(projectFile, `{ "default": { "*": "ask", `);
+
+  expect(await readLayeredPolicy(project)).toEqual({
+    status: "invalid",
+    file: projectFile,
+    reason: "PropertyNameExpected at line 1",
+  });
+});
+
+test("an empty file is invalid, not absent", async () => {
+  await writeAt(projectFile, "  \n");
+
+  expect(await readLayeredPolicy(project)).toEqual({
+    status: "invalid",
+    file: projectFile,
+    reason: "the file is empty",
+  });
+});
+
+test("the global file is read from OPENCODE_CONFIG_DIR when it is set", async () => {
+  await writeAt(globalFile, JSON.stringify({ default: { "*": "deny" } }));
+  await writeAt(xdgGlobalFile, JSON.stringify({ default: { "*": "allow" } }));
+
+  expect(await readLayeredPolicy(project)).toEqual({
+    status: "valid",
+    modes: { default: { bash: {}, wildcard: "deny" } },
+    warnings: [],
+  });
+});
+
+test("the global file is read from XDG_CONFIG_HOME/opencode when OPENCODE_CONFIG_DIR is unset", async () => {
+  delete process.env.OPENCODE_CONFIG_DIR;
+  await writeAt(xdgGlobalFile, JSON.stringify({ default: { "*": "deny" } }));
+
+  expect(await readLayeredPolicy(project)).toEqual({
+    status: "valid",
+    modes: { default: { bash: {}, wildcard: "deny" } },
+    warnings: [],
+  });
+});
+
+test("the global file is read from HOME/.config/opencode when neither variable is set", async () => {
+  delete process.env.OPENCODE_CONFIG_DIR;
+  delete process.env.XDG_CONFIG_HOME;
+  await writeAt(homeGlobalFile, JSON.stringify({ default: { "*": "deny" } }));
+
+  expect(await readLayeredPolicy(project)).toEqual({
+    status: "valid",
+    modes: { default: { bash: {}, wildcard: "deny" } },
+    warnings: [],
+  });
+});
+
 test("a global file that cannot be parsed is invalid, and names the global file", async () => {
   await writeAt(globalFile, `{ "default": { "*": "ask", `);
   await writeAt(projectFile, JSON.stringify({ default: { "*": "deny" } }));
@@ -235,36 +408,60 @@ test("a named mode whose bash block is not an object makes its file invalid", as
   expect(await readLayeredPolicy(project)).toMatchObject({ status: "invalid", file: globalFile });
 });
 
-test("the global file is read from OPENCODE_CONFIG_DIR when it is set", async () => {
-  await writeAt(globalFile, JSON.stringify({ default: { "*": "deny" } }));
-  await writeAt(xdgGlobalFile, JSON.stringify({ default: { "*": "allow" } }));
+test("a mode key other than bash and * makes its file invalid, naming the key and the valid keys", async () => {
+  await writeAt(projectFile, JSON.stringify({ default: { "*": "ask", bahs: { "*": "deny" } } }));
 
   expect(await readLayeredPolicy(project)).toEqual({
-    status: "valid",
-    modes: { default: { bash: {}, wildcard: "deny" } },
-    warnings: [],
+    status: "invalid",
+    file: projectFile,
+    reason: `unknown key 'bahs' in the "default" mode; valid keys are 'bash', '*'`,
   });
 });
 
-test("the global file is read from XDG_CONFIG_HOME/opencode when OPENCODE_CONFIG_DIR is unset", async () => {
-  delete process.env.OPENCODE_CONFIG_DIR;
-  await writeAt(xdgGlobalFile, JSON.stringify({ default: { "*": "deny" } }));
+test.each([
+  ["alow", "'alow'"],
+  [null, "null"],
+  [["ask"], '["ask"]'],
+])(
+  "a mode whose * is %j makes its file invalid, naming the level it should be",
+  async (level, shown) => {
+    await writeAt(projectFile, JSON.stringify({ default: { "*": level } }));
 
-  expect(await readLayeredPolicy(project)).toEqual({
-    status: "valid",
-    modes: { default: { bash: {}, wildcard: "deny" } },
-    warnings: [],
+    expect(await readLayeredPolicy(project)).toEqual({
+      status: "invalid",
+      file: projectFile,
+      reason: `the "*" of the "default" mode should be 'allow', 'ask' or 'deny' (got ${shown})`,
+    });
+  },
+);
+
+test("a mode that is not the selected one is checked too", async () => {
+  await writeAt(projectFile, JSON.stringify({ default: {}, strict: { "*": "alow" } }));
+
+  expect(await readLayeredPolicy(project)).toMatchObject({
+    status: "invalid",
+    file: projectFile,
+    reason: `the "*" of the "strict" mode should be 'allow', 'ask' or 'deny' (got 'alow')`,
   });
 });
 
-test("the global file is read from HOME/.config/opencode when neither variable is set", async () => {
-  delete process.env.OPENCODE_CONFIG_DIR;
-  delete process.env.XDG_CONFIG_HOME;
-  await writeAt(homeGlobalFile, JSON.stringify({ default: { "*": "deny" } }));
+test("a mode's * may be allow, ask, or deny", async () => {
+  await writeAt(
+    projectFile,
+    JSON.stringify({
+      default: { "*": "allow" },
+      strict: { "*": "ask" },
+      personal: { "*": "deny" },
+    }),
+  );
 
   expect(await readLayeredPolicy(project)).toEqual({
     status: "valid",
-    modes: { default: { bash: {}, wildcard: "deny" } },
+    modes: {
+      default: { bash: {}, wildcard: "allow" },
+      strict: { bash: {}, wildcard: "ask" },
+      personal: { bash: {}, wildcard: "deny" },
+    },
     warnings: [],
   });
 });
