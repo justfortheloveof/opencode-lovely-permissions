@@ -1,4 +1,5 @@
 import { Plugin } from "@opencode/plugin";
+import { forgetCommand, recordCommand } from "./command-capture.ts";
 import { resolveEngine } from "./engine.ts";
 import { denyMessage, ENGINE_NOT_FOUND_REASON } from "./messages.ts";
 
@@ -10,7 +11,8 @@ export default Plugin.define({
     const engine = resolveEngine();
     const blocked = engine === undefined ? denyMessage([ENGINE_NOT_FOUND_REASON]) : undefined;
 
-    await ctx.tool.hook("execute.before", () => {});
+    await ctx.tool.hook("execute.before", recordCommand);
+    await ctx.tool.hook("execute.after", forgetCommand);
     await ctx.permission.hook("evaluate", (event) => {
       if (event.action !== SHELL_ACTION || blocked === undefined) return;
       event.effect = "deny";

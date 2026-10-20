@@ -6,7 +6,7 @@
 
 **Status:** ready-for-agent
 
-- [ ] After the before hook fires, the command is retrievable by call ID
-- [ ] The entry is removed when the call finishes
-- [ ] Calls to tools other than shell are not recorded
-- [ ] The command is recorded as written, including pipes, `&&`, and redirections
+- [x] After the before hook fires, the command is retrievable by call ID
+- [x] The entry is removed when the call finishes
+- [x] Calls to tools other than shell are not recorded
+- [x] The command is recorded as written, including pipes, `&&`, and redirections

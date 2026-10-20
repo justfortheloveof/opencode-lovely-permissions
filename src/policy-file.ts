@@ -2,16 +2,33 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { parse, printParseErrorCode, type ParseError } from "jsonc-parser";
 
-const POLICY_FILE_NAME = "lovely-permissions.jsonc";
+export const POLICY_FILE_NAME = "lovely-permissions.jsonc";
 const DEFAULT_MODE = "default";
+
+type Invalid = { status: "invalid"; file: string; reason: string };
+
+export type ModePolicy = { bash: Record<string, unknown>; wildcard: unknown };
+
+export type PolicyFile =
+  | { status: "absent" }
+  | Invalid
+  | { status: "valid"; file: string; modes: Record<string, Record<string, unknown>> };
 
 export type ProjectPolicy =
   | { status: "absent" }
-  | { status: "invalid"; file: string; reason: string }
+  | Invalid
   | { status: "valid"; file: string; bash: Record<string, unknown>; wildcard: unknown };
 
 export async function readProjectPolicy(directory: string): Promise<ProjectPolicy> {
   const file = join(directory, ".opencode", POLICY_FILE_NAME);
+  const policy = await readPolicyFile(file);
+  if (policy.status !== "valid") {
+    return policy;
+  }
+  return { status: "valid", file, ...toModePolicy(policy.modes[DEFAULT_MODE]) };
+}
+
+export async function readPolicyFile(file: string): Promise<PolicyFile> {
   let text: string;
   try {
     text = await readFile(file, "utf-8");
@@ -24,7 +41,11 @@ export async function readProjectPolicy(directory: string): Promise<ProjectPolic
   return parsePolicy(file, text);
 }
 
-function parsePolicy(file: string, text: string): ProjectPolicy {
+export function toModePolicy(mode: Record<string, unknown>): ModePolicy {
+  return { bash: isRecord(mode.bash) ? mode.bash : {}, wildcard: mode["*"] };
+}
+
+function parsePolicy(file: string, text: string): PolicyFile {
   const content = text.replace(/^\uFEFF/, "");
   if (content.trim() === "") {
     return invalid(file, "the file is empty");
@@ -40,28 +61,29 @@ function parsePolicy(file: string, text: string): ProjectPolicy {
   if (!isRecord(parsed)) {
     return invalid(file, "it does not hold an object of modes");
   }
-
-  const mode = parsed[DEFAULT_MODE];
-  if (mode === undefined) {
+  if (parsed[DEFAULT_MODE] === undefined) {
     return invalid(file, `it has no "${DEFAULT_MODE}" mode`);
   }
-  if (!isRecord(mode)) {
-    return invalid(file, `the "${DEFAULT_MODE}" mode is not an object`);
+
+  const modes: Record<string, Record<string, unknown>> = {};
+  for (const [name, mode] of Object.entries(parsed)) {
+    if (!isRecord(mode)) {
+      return invalid(file, `the "${name}" mode is not an object`);
+    }
+    if (mode.bash !== undefined && !isRecord(mode.bash)) {
+      return invalid(file, `the "bash" block of the "${name}" mode is not an object`);
+    }
+    modes[name] = mode;
   }
 
-  const bash = mode.bash === undefined ? {} : mode.bash;
-  if (!isRecord(bash)) {
-    return invalid(file, `the "bash" block of the "${DEFAULT_MODE}" mode is not an object`);
-  }
-
-  return { status: "valid", file, bash, wildcard: mode["*"] };
+  return { status: "valid", file, modes };
 }
 
-function invalid(file: string, reason: string): ProjectPolicy {
+function invalid(file: string, reason: string): Invalid {
   return { status: "invalid", file, reason };
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
+export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 

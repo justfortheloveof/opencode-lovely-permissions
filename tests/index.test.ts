@@ -14,9 +14,13 @@ test("the plugin has a stable identifier", () => {
   expect(plugin.id).toBe("lovely-bash-permissions");
 });
 
-test("setup registers the shell execute-before hook and the permission evaluate hook", async () => {
+test("setup registers the shell execute-before and execute-after hooks and the permission evaluate hook", async () => {
   const harness = await startPlugin();
-  expect([...harness.registered].sort()).toEqual(["permission.evaluate", "tool.execute.before"]);
+  expect([...harness.registered].sort()).toEqual([
+    "permission.evaluate",
+    "tool.execute.after",
+    "tool.execute.before",
+  ]);
 });
 
 describe("when no engine can be found", () => {

@@ -15,11 +15,21 @@ export interface PermissionDecision {
   message: string | undefined;
 }
 
+export interface ToolCall {
+  tool: string;
+  id: string;
+  input: unknown;
+}
+
 export interface PluginHarness {
   /** Hook names the plugin registered, as `domain.name`, e.g. `permission.evaluate`. */
   readonly registered: string[];
   /** Runs the registered permission evaluate hook on one request and returns the effect and message it left. */
   evaluate(request: PermissionRequest): Promise<PermissionDecision>;
+  /** Runs the registered tool execute-before hook, as OpenCode does when a call starts. */
+  startCall(call: ToolCall): Promise<void>;
+  /** Runs the registered tool execute-after hook, as OpenCode does when a call finishes. */
+  finishCall(call: ToolCall): Promise<void>;
 }
 
 /**
@@ -43,8 +53,26 @@ export async function startPlugin(): Promise<PluginHarness> {
 
   await plugin.setup(context);
 
+  const runToolHook = async (name: string, call: ToolCall, extra: Record<string, unknown>) => {
+    const callback = hooks.get(name) as ((event: object) => unknown) | undefined;
+    if (callback === undefined) throw new Error(`the plugin did not register ${name}`);
+    await callback({
+      ...call,
+      sessionID: "ses_test",
+      agent: "build",
+      messageID: "msg_test",
+      ...extra,
+    });
+  };
+
   return {
     registered,
+    async startCall(call) {
+      await runToolHook("tool.execute.before", call, {});
+    },
+    async finishCall(call) {
+      await runToolHook("tool.execute.after", call, { status: "completed" });
+    },
     async evaluate(request) {
       const callback = hooks.get("permission.evaluate") as
         | ((event: PermissionEvaluation) => unknown)
