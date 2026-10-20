@@ -6,12 +6,12 @@ import {
   invalidFileReason,
   rejectedPolicyReason,
 } from "./messages.ts";
+import { DEFAULT_MODE } from "./policy-file.ts";
 import { readLayeredPolicy } from "./policy-layers.ts";
 
 /** A blocked plugin denies every shell call with its message. Later failures reuse this state. */
 export type Startup = { status: "ready" } | { status: "blocked"; message: string };
 
-const DEFAULT_MODE = "default";
 const READY: Startup = { status: "ready" };
 
 export async function checkStartup(

@@ -21,3 +21,8 @@ export function rejectedPolicyReason(error: string): string {
 export function engineUnusableReason(detail: string): string {
   return `The bash engine could not check the policy: ${detail}. Reinstall it with \`uv tool install lovely-bash-permissions\`, or set ${ENGINE_OVERRIDE} to a working engine binary, then restart OpenCode.`;
 }
+
+export function unknownModeReason(mode: string, modes: readonly string[]): string {
+  const names = modes.map((name) => `"${name}"`).join(", ");
+  return `the mode option selects "${mode}", but no policy file defines that mode. The modes that exist are: ${names}. Set the mode option to one of them, then restart OpenCode.`;
+}
