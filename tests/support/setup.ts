@@ -1,19 +1,28 @@
 import { afterEach, beforeEach } from "vite-plus/test";
-import { emptyPathDir } from "./sandbox.ts";
+import { emptyConfigDir, emptyPathDir } from "./sandbox.ts";
 
 const OVERRIDE = "LOVELY_PI_BASH_PERMISSIONS_BIN";
+const CONFIG_DIR = "OPENCODE_CONFIG_DIR";
 
-let saved: { path: string | undefined; override: string | undefined } | undefined;
+let saved:
+  | { path: string | undefined; override: string | undefined; configDir: string | undefined }
+  | undefined;
 
 /**
- * Every test starts with no engine reachable. PATH is an empty directory and the
- * override is unset, so a test that does not arrange an engine can never run the
- * real one. Lookup tests that need PATH set it themselves.
+ * Every test starts with no engine reachable and no global policy. PATH is an empty
+ * directory, the override is unset, and the configuration directory is empty, so a
+ * test that does not arrange them can never run the real engine or read the real
+ * user configuration. Tests that need them set them themselves.
  */
 beforeEach(() => {
-  saved = { path: process.env.PATH, override: process.env[OVERRIDE] };
+  saved = {
+    path: process.env.PATH,
+    override: process.env[OVERRIDE],
+    configDir: process.env[CONFIG_DIR],
+  };
   process.env.PATH = emptyPathDir;
   delete process.env[OVERRIDE];
+  process.env[CONFIG_DIR] = emptyConfigDir;
 });
 
 afterEach(() => {
@@ -22,5 +31,7 @@ afterEach(() => {
   else process.env.PATH = saved.path;
   if (saved.override === undefined) delete process.env[OVERRIDE];
   else process.env[OVERRIDE] = saved.override;
+  if (saved.configDir === undefined) delete process.env[CONFIG_DIR];
+  else process.env[CONFIG_DIR] = saved.configDir;
   saved = undefined;
 });

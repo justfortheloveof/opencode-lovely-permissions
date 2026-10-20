@@ -7,7 +7,7 @@ export class EngineError extends Error {}
 export interface EvaluateRequest {
   command: string;
   bash: Record<string, unknown>;
-  topLevel: string;
+  topLevel: unknown;
 }
 
 export interface Verdict {

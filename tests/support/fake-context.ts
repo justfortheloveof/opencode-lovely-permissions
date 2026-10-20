@@ -1,6 +1,7 @@
 import type { Plugin } from "@opencode/plugin";
 import type { PermissionEvaluation } from "@opencode/plugin/promise/permission";
 import plugin from "../../src/index.ts";
+import { emptyProjectDir } from "./sandbox.ts";
 
 type Hook = (event: never) => unknown;
 
@@ -8,6 +9,7 @@ export interface PermissionRequest {
   action: string;
   resources: string[];
   effect: PermissionEvaluation["effect"];
+  source?: PermissionEvaluation["source"];
 }
 
 export interface PermissionDecision {
@@ -35,9 +37,10 @@ export interface PluginHarness {
 /**
  * Calls the plugin's setup with a fake context and returns the hooks it registered.
  * The fake records every registration, so a test can see what the plugin asked for
- * and drive those hooks the way OpenCode would.
+ * and drive those hooks the way OpenCode would. The plugin reads its project policy
+ * from `directory`, which is empty unless a test passes one.
  */
-export async function startPlugin(): Promise<PluginHarness> {
+export async function startPlugin(directory: string = emptyProjectDir): Promise<PluginHarness> {
   const hooks = new Map<string, Hook>();
   const registered: string[] = [];
   const registration = { dispose: async () => {} };
@@ -47,6 +50,7 @@ export async function startPlugin(): Promise<PluginHarness> {
     return registration;
   };
   const context = {
+    location: { directory },
     tool: { hook: register("tool") },
     permission: { hook: register("permission") },
   } as unknown as Plugin.Context;
@@ -85,6 +89,7 @@ export async function startPlugin(): Promise<PluginHarness> {
         action: request.action,
         effect: request.effect,
         message: undefined,
+        source: request.source,
       } satisfies PermissionEvaluation;
       await callback(event);
       return { effect: event.effect, message: event.message };
