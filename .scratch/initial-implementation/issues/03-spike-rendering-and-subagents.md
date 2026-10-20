@@ -6,7 +6,7 @@
 
 **Status:** ready-for-agent
 
-- [ ] Recorded: whether multi-line messages render as bullets, with the rendered text as evidence
-- [ ] If they do not, the spec's message decision is amended to one line per reason
-- [ ] Recorded: whether subagent shell calls reach the permission hook
-- [ ] If subagent calls bypass the hook, story 47 is amended in the spec
+- [x] Recorded: whether multi-line messages render as bullets, with the rendered text as evidence
+- [x] If they do not, the spec's message decision is amended to one line per reason
+- [x] Recorded: whether subagent shell calls reach the permission hook
+- [x] If subagent calls bypass the hook, story 47 is amended in the spec
