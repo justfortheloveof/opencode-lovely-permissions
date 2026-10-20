@@ -4,18 +4,30 @@ import { onMount } from "opentui:runtime-module:solid-js";
 import { pickAskBannerMessage } from "./ask-banner.ts";
 
 function AskBannerSlot(context: Plugin.Context, sessionID: string) {
-  onMount(() => {
-    const sessionIDs = new Set([sessionID, ...context.data.session.family(sessionID)]);
-    void Promise.all(
-      [...sessionIDs].map((familySessionID) =>
-        context.data.session.permission.sync(familySessionID),
-      ),
-    );
-  });
+  try {
+    const familySessionIDs = context.data.session.family(sessionID);
+    onMount(() => {
+      const sessionIDs = new Set([sessionID, ...familySessionIDs]);
+      void Promise.all(
+        [...sessionIDs].map((familySessionID) =>
+          context.data.session.permission.sync(familySessionID),
+        ),
+      );
+    });
 
-  const asks = context.data.session.permission.list(sessionID) ?? [];
-  const message = pickAskBannerMessage(asks.map(({ message }) => ({ message: message ?? "" })));
-  return message === undefined ? null : jsx("text", { children: message });
+    if (context.data.session.get(sessionID)?.parentID) return null;
+
+    const asks = [
+      ...(context.data.session.permission.list(sessionID) ?? []),
+      ...familySessionIDs
+        .filter((familySessionID) => familySessionID !== sessionID)
+        .flatMap((familySessionID) => context.data.session.permission.list(familySessionID) ?? []),
+    ];
+    const message = pickAskBannerMessage(asks.map(({ message }) => ({ message: message ?? "" })));
+    return message === undefined ? null : jsx("text", { children: message });
+  } catch {
+    return null;
+  }
 }
 
 export default Plugin.define({

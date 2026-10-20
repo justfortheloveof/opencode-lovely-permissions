@@ -5,6 +5,10 @@ interface PendingPermission {
   readonly message?: string;
 }
 
+interface SessionInfo {
+  readonly parentID?: string;
+}
+
 interface SlotInput {
   readonly sessionID: string;
 }
@@ -25,15 +29,16 @@ export interface TerminalPluginHarness {
   render(input: SlotInput): unknown;
 }
 
-interface TerminalPluginOptions {
-  readonly sessionFamilies?: Readonly<Record<string, readonly string[]>>;
+interface SessionState {
+  readonly sessionsByID?: Readonly<Record<string, SessionInfo>>;
+  readonly familyBySession?: Readonly<Record<string, readonly string[]>>;
   readonly permissionsAfterSync?: Readonly<Record<string, readonly PendingPermission[]>>;
 }
 
 /** Runs the terminal plugin against fake pending permissions and records its slots. */
 export async function startTerminalPlugin(
   permissionsBySession: Readonly<Record<string, readonly PendingPermission[]>>,
-  options: TerminalPluginOptions = {},
+  sessionState: SessionState = {},
 ): Promise<TerminalPluginHarness> {
   const registered: string[] = [];
   const permissionLookups: string[] = [];
@@ -42,12 +47,17 @@ export async function startTerminalPlugin(
   const currentPermissions: Record<string, readonly PendingPermission[]> = {
     ...permissionsBySession,
   };
+  const sessionsByID = sessionState.sessionsByID ?? {};
+  const familyBySession = sessionState.familyBySession ?? {};
 
   const context = {
     data: {
       session: {
+        get(sessionID: string) {
+          return sessionsByID[sessionID] ?? {};
+        },
         family(sessionID: string) {
-          return options.sessionFamilies?.[sessionID] ?? [];
+          return familyBySession[sessionID] ?? [sessionID];
         },
         permission: {
           list(sessionID: string) {
@@ -56,7 +66,7 @@ export async function startTerminalPlugin(
           },
           sync(sessionID: string) {
             permissionSyncs.push(sessionID);
-            const permissions = options.permissionsAfterSync?.[sessionID];
+            const permissions = sessionState.permissionsAfterSync?.[sessionID];
             if (permissions !== undefined) currentPermissions[sessionID] = permissions;
             return Promise.resolve();
           },
