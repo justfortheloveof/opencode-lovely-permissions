@@ -180,6 +180,9 @@ If the engine is missing or the policy is invalid, every shell command is denied
 - OpenCode renders multi-line permission messages as bullets. If it does not, the message falls back to one line per reason.
 - Subagent shell calls reach the permission hook.
 - The `OPENCODE_CONFIG_DIR` environment variable is the directory that holds the global configuration, and its exact behaviour.
+- Confirmed on OpenCode 2.0.30 (ticket 02): `execute.before` fires before the permission request. For an allowed shell call, `tool.execute.before` was logged before `permission.evaluate`. For a call OpenCode marks `ask`, `tool.execute.before` came first, then `permission.evaluate` (effect `ask`), then the `permission.asked` event. Logs: `/tmp/opencode/implement-spec/spikes/02-command-capture/out/`.
+- Confirmed: the call ID matches. The `id` on `tool.execute.before` equals `source.id` on `permission.evaluate` and on the `permission.asked` event, in both runs.
+- Confirmed: the captured string is the full command line. `input.command` was `echo hi | cat > <path> && true`, including the pipe, redirection, and `&&`. The permission request's `resources` are split per simple command (`echo hi`, `cat`, `true`), so the captured string is what the engine needs. One run's captured command had a trailing space, so the engine should not depend on exact trailing whitespace. No answer was no, so the Command capture decision is unchanged.
 
 **Prior decisions.** The decisions in this spec came out of a grilling session. Recorded decisions are in ADR 0001, ADR 0002, and ADR 0003. The vocabulary is in the glossary.
 

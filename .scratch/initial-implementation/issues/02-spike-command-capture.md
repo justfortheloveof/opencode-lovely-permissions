@@ -6,7 +6,7 @@
 
 **Status:** ready-for-agent
 
-- [ ] Recorded: whether `execute.before` fires before the permission request
-- [ ] Recorded: whether the call ID matches between the before hook and the permission request
-- [ ] Recorded: whether the captured string is the full command, including pipes, `&&`, and redirections
-- [ ] If any answer is no, the spec's command capture decision is amended
+- [x] Recorded: whether `execute.before` fires before the permission request
+- [x] Recorded: whether the call ID matches between the before hook and the permission request
+- [x] Recorded: whether the captured string is the full command, including pipes, `&&`, and redirections
+- [x] If any answer is no, the spec's command capture decision is amended
