@@ -8,7 +8,17 @@ export default Plugin.define({
     context.ui.slot({
       append: "session.composer.top",
       render: ({ sessionID }) => {
-        const asks = context.data.session.permission.list(sessionID) ?? [];
+        if (context.data.session.get(sessionID)?.parentID) return null;
+
+        const asks = [
+          ...(context.data.session.permission.list(sessionID) ?? []),
+          ...context.data.session
+            .family(sessionID)
+            .filter((familySessionID) => familySessionID !== sessionID)
+            .flatMap(
+              (familySessionID) => context.data.session.permission.list(familySessionID) ?? [],
+            ),
+        ];
         const message = pickAskBannerMessage(
           asks.map(({ message }) => ({ message: message ?? "" })),
         );

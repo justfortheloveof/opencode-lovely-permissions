@@ -5,6 +5,10 @@ interface PendingPermission {
   readonly message?: string;
 }
 
+interface SessionInfo {
+  readonly parentID?: string;
+}
+
 interface SlotInput {
   readonly sessionID: string;
 }
@@ -23,17 +27,31 @@ export interface TerminalPluginHarness {
   render(input: SlotInput): unknown;
 }
 
+interface SessionState {
+  readonly sessionsByID?: Readonly<Record<string, SessionInfo>>;
+  readonly familyBySession?: Readonly<Record<string, readonly string[]>>;
+}
+
 /** Runs the terminal plugin against fake pending permissions and records its slots. */
 export async function startTerminalPlugin(
   permissionsBySession: Readonly<Record<string, readonly PendingPermission[]>>,
+  sessionState: SessionState = {},
 ): Promise<TerminalPluginHarness> {
   const registered: string[] = [];
   const permissionLookups: string[] = [];
   const slots: RecordedSlot[] = [];
+  const sessionsByID = sessionState.sessionsByID ?? {};
+  const familyBySession = sessionState.familyBySession ?? {};
 
   const context = {
     data: {
       session: {
+        get(sessionID: string) {
+          return sessionsByID[sessionID] ?? {};
+        },
+        family(sessionID: string) {
+          return familyBySession[sessionID] ?? [sessionID];
+        },
         permission: {
           list(sessionID: string) {
             permissionLookups.push(sessionID);
