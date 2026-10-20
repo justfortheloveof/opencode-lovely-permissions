@@ -6,7 +6,7 @@
 
 **Status:** ready-for-agent
 
-- [ ] A scalar overridden by a later file produces a warning naming the dotted key and both files
-- [ ] Array and object merges produce no override warning
-- [ ] With no policy file at all, every shell call gets the ask effect, and the message names the three expected locations
+- [x] A scalar overridden by a later file produces a warning naming the dotted key and both files
+- [x] Array and object merges produce no override warning
+- [x] With no policy file at all, every shell call gets the ask effect, and the message names the three expected locations
 - [ ] Warnings reach the user in OpenCode, not only the logs

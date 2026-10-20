@@ -4,21 +4,26 @@ import { commandFor, forgetCommand, recordCommand } from "./command-capture.ts";
 import { EngineError, evaluate, type Verdict } from "./engine-client.ts";
 import { resolveEngine } from "./engine.ts";
 import { fallbackLevel } from "./fallback.ts";
-import { askMessage, denyMessage, UNMATCHED_REASON } from "./messages.ts";
+import { askMessage, denyMessage, noPolicyMessage, UNMATCHED_REASON } from "./messages.ts";
 import { DEFAULT_MODE, type ModePolicy } from "./policy-file.ts";
-import { readLayeredPolicy } from "./policy-layers.ts";
+import { policyLocations, readLayeredPolicy } from "./policy-layers.ts";
 import { checkStartup } from "./startup.ts";
 
 const SHELL_ACTION = "shell";
-const ABSENT_POLICY: ModePolicy = { bash: {}, wildcard: "ask" };
+/** Stands in for the mode when there is no valid policy. The engine is never asked for a verdict then. */
+const NO_MODE: ModePolicy = { bash: {}, wildcard: undefined };
 
 export default Plugin.define({
   id: "lovely-bash-permissions",
   async setup(ctx) {
     const engine = resolveEngine();
     const policy = await readLayeredPolicy(ctx.location.directory);
-    const mode = policy.status === "valid" ? policy.modes[DEFAULT_MODE] : ABSENT_POLICY;
+    if (policy.status === "valid") {
+      for (const warning of policy.warnings) console.warn(warning);
+    }
+    const mode = policy.status === "valid" ? policy.modes[DEFAULT_MODE] : NO_MODE;
     const startup = await checkStartup(engine, policy, mode);
+    const locations = policyLocations(ctx.location.directory);
 
     await ctx.tool.hook("execute.before", recordCommand);
     await ctx.tool.hook("execute.after", forgetCommand);
@@ -29,6 +34,11 @@ export default Plugin.define({
         return;
       }
       if (event.effect === "deny") return;
+      if (policy.status === "absent") {
+        event.effect = "ask";
+        event.message = noPolicyMessage(locations);
+        return;
+      }
       const command = event.source === undefined ? undefined : commandFor(event.source.id);
       if (command === undefined) {
         deny(event, denyMessage([UNMATCHED_REASON]));

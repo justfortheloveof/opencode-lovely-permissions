@@ -1,5 +1,6 @@
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { overriddenKeyWarning } from "./messages.ts";
 import {
   isRecord,
   POLICY_FILE_NAME,
@@ -13,17 +14,31 @@ const LOCAL_POLICY_FILE_NAME = "lovely-permissions.local.jsonc";
 export type LayeredPolicy =
   | { status: "absent" }
   | { status: "invalid"; file: string; reason: string }
-  | { status: "valid"; modes: Record<string, ModePolicy> };
+  | { status: "valid"; modes: Record<string, ModePolicy>; warnings: string[] };
+
+export interface PolicyLocations {
+  global: string;
+  project: string;
+  local: string;
+}
+
+/** Where the three policy files live for a project. Later files win over earlier ones. */
+export function policyLocations(directory: string): PolicyLocations {
+  const projectDirectory = join(directory, ".opencode");
+  return {
+    global: join(globalConfigDirectory(), POLICY_FILE_NAME),
+    project: join(projectDirectory, POLICY_FILE_NAME),
+    local: join(projectDirectory, LOCAL_POLICY_FILE_NAME),
+  };
+}
 
 export async function readLayeredPolicy(directory: string): Promise<LayeredPolicy> {
-  const projectDirectory = join(directory, ".opencode");
-  const files = [
-    join(globalConfigDirectory(), POLICY_FILE_NAME),
-    join(projectDirectory, POLICY_FILE_NAME),
-    join(projectDirectory, LOCAL_POLICY_FILE_NAME),
-  ];
+  const locations = policyLocations(directory);
+  const files = [locations.global, locations.project, locations.local];
 
   const merged: Record<string, Record<string, unknown>> = {};
+  const origins = new Map<string, string>();
+  const warnings: string[] = [];
   for (const file of files) {
     const policy = await readPolicyFile(file);
     if (policy.status === "absent") {
@@ -33,7 +48,8 @@ export async function readLayeredPolicy(directory: string): Promise<LayeredPolic
       return policy;
     }
     for (const [name, mode] of Object.entries(policy.modes)) {
-      merged[name] = Object.hasOwn(merged, name) ? mergeObjects(merged[name], mode) : mode;
+      const earlier = Object.hasOwn(merged, name) ? merged[name] : {};
+      merged[name] = mergeLayer(earlier, mode, name, file, origins, warnings);
     }
   }
 
@@ -44,6 +60,7 @@ export async function readLayeredPolicy(directory: string): Promise<LayeredPolic
   return {
     status: "valid",
     modes: Object.fromEntries(names.map((name) => [name, toModePolicy(merged[name])])),
+    warnings,
   };
 }
 
@@ -55,23 +72,44 @@ function globalConfigDirectory(): string {
   return join(process.env.XDG_CONFIG_HOME || join(homedir(), ".config"), "opencode");
 }
 
-function mergeObjects(
+/**
+ * Lays one file's value over what the earlier files left. Objects merge and arrays
+ * concatenate. Any other value replaces the earlier one, and a replacement that changes
+ * a value set earlier is recorded as a warning. `origins` holds, per dotted key, the
+ * file that last set it, so the warning can name both files.
+ */
+function mergeLayer(
   earlier: Record<string, unknown>,
   later: Record<string, unknown>,
+  path: string,
+  file: string,
+  origins: Map<string, string>,
+  warnings: string[],
 ): Record<string, unknown> {
   const merged: Record<string, unknown> = { ...earlier };
   for (const [key, value] of Object.entries(later)) {
-    merged[key] = mergeValues(earlier[key], value);
+    const dotted = `${path}.${key}`;
+    const has = Object.hasOwn(earlier, key);
+    const before = has ? earlier[key] : undefined;
+    if (isRecord(value) && (isRecord(before) || !has)) {
+      merged[key] = mergeLayer(
+        isRecord(before) ? before : {},
+        value,
+        dotted,
+        file,
+        origins,
+        warnings,
+      );
+    } else if (Array.isArray(before) && Array.isArray(value)) {
+      merged[key] = [...before, ...value];
+    } else {
+      const previous = origins.get(dotted);
+      if (has && before !== value && previous !== undefined) {
+        warnings.push(overriddenKeyWarning(dotted, previous, file));
+      }
+      merged[key] = value;
+    }
+    origins.set(dotted, file);
   }
   return merged;
-}
-
-function mergeValues(earlier: unknown, later: unknown): unknown {
-  if (isRecord(earlier) && isRecord(later)) {
-    return mergeObjects(earlier, later);
-  }
-  if (Array.isArray(earlier) && Array.isArray(later)) {
-    return [...earlier, ...later];
-  }
-  return later;
 }
