@@ -1,9 +1,8 @@
 import { ENGINE_BINARY, ENGINE_OVERRIDE } from "./engine.ts";
 import { PROTOCOL_VERSION } from "./engine-client.ts";
+import { ASK_LABEL, DENY_LABEL, NOT_RUN } from "./labels.ts";
 
-export const ASK_LABEL = "[♡ perms: 💛 REQUIRES-USER-APPROVAL]";
-export const DENY_LABEL = "[♡ perms: ❤️ auto-rejected]";
-export const NOT_RUN = "The tool has not been run.";
+export { ASK_LABEL, DENY_LABEL, NOT_RUN };
 
 /** The closing sentence as the engine writes it, which has no full stop. */
 const ENGINE_NOT_RUN = /\s*The tool has not been run\.?$/;
