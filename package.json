@@ -4,6 +4,7 @@
   "description": "Lovely bash permissions for OpenCode",
   "license": "MIT",
   "files": [
+    "index.ts",
     "src"
   ],
   "type": "module",
