@@ -1,4 +1,4 @@
-Status: ready-for-agent
+Status: resolved
 
 # 05: Subagent asks in the parent's banner
 
@@ -7,8 +7,8 @@ Status: ready-for-agent
 **What to build:** In a root session, the slot gathers the viewed session's pending asks first, then the pending asks from its family's other sessions, in family order. The rule receives that combined list. A session that has a parent shows no banner, as the prompt does.
 
 **Acceptance criteria:**
-- [ ] A subagent's ask shows in the parent's banner when it is first in order.
-- [ ] The viewed session's own asks come before subagent asks.
-- [ ] Subagent asks follow family order.
-- [ ] A session that has a parent shows nothing, even when it has pending asks of its own.
-- [ ] Unit tests only. No OpenCode app run.
+- [x] A subagent's ask shows in the parent's banner when it is first in order.
+- [x] The viewed session's own asks come before subagent asks.
+- [x] Subagent asks follow family order.
+- [x] A session that has a parent shows nothing, even when it has pending asks of its own.
+- [x] Unit tests only. No OpenCode app run.
