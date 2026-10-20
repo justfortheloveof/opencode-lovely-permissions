@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, beforeEach, expect, test } from "vite-plus/test";
-import { readLayeredPolicy } from "../src/policy-layers.ts";
+import { policyLocations, readLayeredPolicy } from "../src/policy-layers.ts";
 
 const ENV_KEYS = ["HOME", "XDG_CONFIG_HOME", "OPENCODE_CONFIG_DIR"] as const;
 
@@ -83,6 +83,10 @@ test("the local file overrides the project file, which overrides the global file
       },
       strict: { bash: { "*": "deny" }, wildcard: "ask" },
     },
+    warnings: [
+      `the policy key default.bash.subshell in ${projectFile} overrides the value set in ${globalFile}`,
+      `the policy key default.bash.subshell in ${localFile} overrides the value set in ${projectFile}`,
+    ],
   });
 });
 
@@ -96,6 +100,7 @@ test("a mode that only one file defines is kept as written", async () => {
       default: { bash: {}, wildcard: undefined },
       personal: { bash: {}, wildcard: "deny" },
     },
+    warnings: [],
   });
 });
 
@@ -177,6 +182,7 @@ test("arrays concatenate in file order across the three files", async () => {
         wildcard: undefined,
       },
     },
+    warnings: [],
   });
 });
 
@@ -186,6 +192,7 @@ test("a missing file is not an error, and the files that exist are merged", asyn
   expect(await readLayeredPolicy(project)).toEqual({
     status: "valid",
     modes: { default: { bash: {}, wildcard: "ask" } },
+    warnings: [],
   });
 });
 
@@ -235,6 +242,7 @@ test("the global file is read from OPENCODE_CONFIG_DIR when it is set", async ()
   expect(await readLayeredPolicy(project)).toEqual({
     status: "valid",
     modes: { default: { bash: {}, wildcard: "deny" } },
+    warnings: [],
   });
 });
 
@@ -245,6 +253,7 @@ test("the global file is read from XDG_CONFIG_HOME/opencode when OPENCODE_CONFIG
   expect(await readLayeredPolicy(project)).toEqual({
     status: "valid",
     modes: { default: { bash: {}, wildcard: "deny" } },
+    warnings: [],
   });
 });
 
@@ -256,5 +265,87 @@ test("the global file is read from HOME/.config/opencode when neither variable i
   expect(await readLayeredPolicy(project)).toEqual({
     status: "valid",
     modes: { default: { bash: {}, wildcard: "deny" } },
+    warnings: [],
+  });
+});
+
+test("a scalar that a later file overrides is warned about, naming the dotted key and both files", async () => {
+  await writeAt(globalFile, JSON.stringify({ default: { bash: { subshell: "allow" } } }));
+  await writeAt(projectFile, JSON.stringify({ default: { bash: { subshell: "deny" } } }));
+
+  expect(await readLayeredPolicy(project)).toMatchObject({
+    status: "valid",
+    warnings: [
+      `the policy key default.bash.subshell in ${projectFile} overrides the value set in ${globalFile}`,
+    ],
+  });
+});
+
+test("a wildcard that a later file overrides is named by its mode and *", async () => {
+  await writeAt(globalFile, JSON.stringify({ default: { "*": "deny" } }));
+  await writeAt(projectFile, JSON.stringify({ default: { "*": "ask" } }));
+
+  expect(await readLayeredPolicy(project)).toMatchObject({
+    status: "valid",
+    warnings: [
+      `the policy key default.* in ${projectFile} overrides the value set in ${globalFile}`,
+    ],
+  });
+});
+
+test("a key overridden by two later files warns twice, each time naming the file that last set it", async () => {
+  await writeAt(globalFile, JSON.stringify({ default: { "*": "deny" } }));
+  await writeAt(projectFile, JSON.stringify({ default: { "*": "ask" } }));
+  await writeAt(localFile, JSON.stringify({ default: { "*": "allow" } }));
+
+  expect(await readLayeredPolicy(project)).toMatchObject({
+    status: "valid",
+    warnings: [
+      `the policy key default.* in ${projectFile} overrides the value set in ${globalFile}`,
+      `the policy key default.* in ${localFile} overrides the value set in ${projectFile}`,
+    ],
+  });
+});
+
+test("a later file that sets a key to the value it already has is not an override", async () => {
+  await writeAt(globalFile, JSON.stringify({ default: { "*": "ask" } }));
+  await writeAt(projectFile, JSON.stringify({ default: { "*": "ask" } }));
+
+  expect(await readLayeredPolicy(project)).toMatchObject({ status: "valid", warnings: [] });
+});
+
+test("objects and arrays that several files set produce no override warning", async () => {
+  await writeAt(
+    globalFile,
+    JSON.stringify({
+      default: { bash: { output_redirection: { "*": "ask" }, allowed_cmds_regex: ["^a$"] } },
+    }),
+  );
+  await writeAt(
+    projectFile,
+    JSON.stringify({
+      default: { bash: { output_redirection: { other: "deny" }, allowed_cmds_regex: ["^b$"] } },
+    }),
+  );
+  await writeAt(
+    localFile,
+    JSON.stringify({
+      default: {
+        bash: {
+          output_redirection: { stdout_to_dev_null: "allow" },
+          allowed_cmds_regex: ["^c$"],
+        },
+      },
+    }),
+  );
+
+  expect(await readLayeredPolicy(project)).toMatchObject({ status: "valid", warnings: [] });
+});
+
+test("the expected policy locations are the global file, the project file, and the local file", () => {
+  expect(policyLocations(project)).toEqual({
+    global: globalFile,
+    project: projectFile,
+    local: localFile,
   });
 });

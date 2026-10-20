@@ -1,6 +1,6 @@
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { describe, expect, test } from "vite-plus/test";
+import { describe, expect, test, vi } from "vite-plus/test";
 import plugin from "../src/index.ts";
 import { startPlugin } from "./support/fake-context.ts";
 import { sandboxRoot } from "./support/sandbox.ts";
@@ -122,6 +122,26 @@ describe("when the policy is valid", () => {
       effect: "ask",
       message: "[♡ perms: 💛 REQUIRES-USER-APPROVAL]\n- the command matches no allowed pattern",
     });
+  });
+
+  test("a scalar that a later file overrides is logged as a warning at setup", async () => {
+    const globalDir = mkdtempSync(join(sandboxRoot, "global-"));
+    writeFileSync(
+      join(globalDir, "lovely-permissions.jsonc"),
+      JSON.stringify({ default: { bash: { "*": "allow" } } }),
+    );
+    process.env.OPENCODE_CONFIG_DIR = globalDir;
+    useEngine({ protocol: 1, valid: true });
+    const directory = projectWith({ default: { bash: { "*": "deny" } } });
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      await startPlugin(directory);
+      expect(warn).toHaveBeenCalledWith(
+        `the policy key default.bash.* in ${join(directory, ".opencode", "lovely-permissions.jsonc")} overrides the value set in ${join(globalDir, "lovely-permissions.jsonc")}`,
+      );
+    } finally {
+      warn.mockRestore();
+    }
   });
 });
 

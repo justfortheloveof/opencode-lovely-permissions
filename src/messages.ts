@@ -35,6 +35,24 @@ export function unknownModeReason(mode: string, modes: readonly string[]): strin
   return `the mode option selects "${mode}", but no policy file defines that mode. The modes that exist are: ${names}. Set the mode option to one of them, then restart OpenCode.`;
 }
 
+/** A layering warning: a later file changed a key that an earlier file set. */
+export function overriddenKeyWarning(key: string, earlier: string, later: string): string {
+  return `the policy key ${key} in ${later} overrides the value set in ${earlier}`;
+}
+
+/** An ask for a missing policy: the label, then one bullet per location a policy may be in. */
+export function noPolicyMessage(locations: {
+  global: string;
+  project: string;
+  local: string;
+}): string {
+  return askMessage([
+    `no global policy file at ${locations.global}`,
+    `no project policy file at ${locations.project}`,
+    `no local policy file at ${locations.local}`,
+  ]);
+}
+
 function bullets(reasons: readonly string[]): string[] {
   return reasons.map((reason) => `- ${reason}`);
 }
