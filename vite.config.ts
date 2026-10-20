@@ -21,6 +21,10 @@ export default defineConfig({
         "./tests/support/host-jsx-runtime.ts",
         import.meta.url,
       ).pathname,
+      "opentui:runtime-module:solid-js": new URL(
+        "./tests/support/host-solid-runtime.ts",
+        import.meta.url,
+      ).pathname,
     },
     coverage: {
       reporter: ["text"],

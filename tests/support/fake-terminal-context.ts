@@ -19,25 +19,46 @@ export interface TerminalPluginHarness {
   readonly registered: string[];
   /** Session IDs requested from the fake permission data. */
   readonly permissionLookups: string[];
+  /** Session IDs whose pending permissions were synced when the slot mounted. */
+  readonly permissionSyncs: string[];
   /** Runs the registered composer-top slot with the host-provided input. */
   render(input: SlotInput): unknown;
+}
+
+interface TerminalPluginOptions {
+  readonly sessionFamilies?: Readonly<Record<string, readonly string[]>>;
+  readonly permissionsAfterSync?: Readonly<Record<string, readonly PendingPermission[]>>;
 }
 
 /** Runs the terminal plugin against fake pending permissions and records its slots. */
 export async function startTerminalPlugin(
   permissionsBySession: Readonly<Record<string, readonly PendingPermission[]>>,
+  options: TerminalPluginOptions = {},
 ): Promise<TerminalPluginHarness> {
   const registered: string[] = [];
   const permissionLookups: string[] = [];
+  const permissionSyncs: string[] = [];
   const slots: RecordedSlot[] = [];
+  const currentPermissions: Record<string, readonly PendingPermission[]> = {
+    ...permissionsBySession,
+  };
 
   const context = {
     data: {
       session: {
+        family(sessionID: string) {
+          return options.sessionFamilies?.[sessionID] ?? [];
+        },
         permission: {
           list(sessionID: string) {
             permissionLookups.push(sessionID);
-            return permissionsBySession[sessionID];
+            return currentPermissions[sessionID];
+          },
+          sync(sessionID: string) {
+            permissionSyncs.push(sessionID);
+            const permissions = options.permissionsAfterSync?.[sessionID];
+            if (permissions !== undefined) currentPermissions[sessionID] = permissions;
+            return Promise.resolve();
           },
         },
       },
@@ -64,6 +85,7 @@ export async function startTerminalPlugin(
   return {
     registered,
     permissionLookups,
+    permissionSyncs,
     render(input) {
       const slot = slots.find(({ path }) => path === "session.composer.top");
       if (slot === undefined) throw new Error("the plugin did not register session.composer.top");

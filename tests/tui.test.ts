@@ -9,6 +9,25 @@ describe("terminal plugin", () => {
 
     expect(harness.registered).toContain("session.composer.top");
     expect(harness.permissionLookups).toEqual(["ses_viewed"]);
+    expect(harness.permissionSyncs).toEqual(["ses_viewed"]);
+  });
+
+  test("syncs the viewed session and its family on mount before displaying its pending ask", async () => {
+    const message = "[♡ perms: 💛 REQUIRES-USER-APPROVAL]\n- synced ask reason";
+    const harness = await startTerminalPlugin(
+      { ses_viewed: [], ses_child: [] },
+      {
+        sessionFamilies: { ses_viewed: ["ses_viewed", "ses_child"] },
+        permissionsAfterSync: { ses_viewed: [{ message }] },
+      },
+    );
+
+    expect(harness.permissionSyncs).toEqual([]);
+    expect(harness.render({ sessionID: "ses_viewed" })).toEqual({
+      type: "text",
+      props: { children: message },
+    });
+    expect(harness.permissionSyncs).toEqual(["ses_viewed", "ses_child"]);
   });
 
   test("renders a branded ask using the rule's message verbatim", async () => {
