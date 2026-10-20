@@ -54,9 +54,9 @@ Agent visibility
 Installation and remote servers
 
 19. As a user, I want the terminal half to ship in the same package as the server half, so that I install one package.
-20. As a user, I want to add the package to the terminal client's `cli.json`, so that the banner works against any server I connect to.
-21. As a user connected to a remote server that runs the server half, I want the banner to show that server's asks, so that remote asks show their reasons.
-22. As a user connected to a remote server that does not run the server half, I want no banner and no error, because that server produces no asks from this plugin.
+20. As a user, I want to add the package to the terminal client's `cli.json`, so that the banner is loaded locally when the terminal session supports it.
+21. **Deferred (user waived ticket 09):** behavior when connected to a remote server that runs the server half is unverified and is not required for this release.
+22. **Deferred (user waived ticket 09):** behavior when connected to a remote server without the server half is unverified and is not required for this release.
 23. As a server operator, I want the README to say every server that runs commands must load the plugin, so that commands are never run ungated.
 24. As a user, I want the README to say that a terminal machine needs the `cli.json` entry, so that the banner appears on my machine.
 
@@ -77,7 +77,7 @@ Documentation
 ## Implementation Decisions
 
 - The server half is unchanged. Verdicts, the ask message, and the deny message keep their current content and placement. The ask brand label and deny brand label stay as the glossary defines them.
-- The terminal half is a second entry point of this package, exported beside the server entry and shipped in the package as `src/tui.ts`. OpenCode loads it when the connected server lists the package as active with a terminal entry, and also from the terminal client's `cli.json`. The `cli.json` entry is required, so the banner works against any server.
+- The terminal half is a second entry point of this package, exported beside the server entry and shipped in the package as `src/tui.ts`. The terminal client's `cli.json` entry is the explicit local loading path. Automatic server-listed loading from a remote server is unverified and is not a release claim.
 - The terminal entry must contain no raw JSX syntax. It builds Solid elements with explicit `jsx()` calls (and `jsxs()` when needed) imported from the host virtual runtime module `opentui:runtime-module:%40opentui%2Fsolid%2Fjsx-runtime`, and imports the plugin SDK from `opentui:runtime-module:%40opencode%2Fplugin%2Ftui`. OpenCode's external package loader provides these host modules. The OpenTUI Solid transform excludes source under `node_modules`, and Bun may inject an unresolvable React or local JSX-runtime import for external JSX; do not ship raw JSX or work around this with React or a local/Vite JSX transform.
 - The banner is one slot above the composer in the session view. The slot receives the session ID.
 - Which ask the banner shows follows the permission prompt. It takes the first pending ask across the viewed session and its descendant sessions, in that order. Nothing shows when the viewed session has a parent. Nothing shows when the chosen ask's message does not start with the ask brand label, or when the ask has no reasons. The choice is a pure rule. The slot gathers the ordered asks and passes them to the rule, so the rule can be tested without the UI.
@@ -100,7 +100,7 @@ Modules and cases:
 - **Server half (existing harness).** Regression only. The existing tests keep the ask and deny messages unchanged.
 - **Package entry and manifest.** Extend the existing package-entry test to import the public `opencode-lovely-bash-permissions/tui` subpath, verify its plugin identifier, and check that the manifest exports and ships `src/tui.ts` with the optional peer ranges. Test-only aliases provide small fakes for the two host virtual runtime IDs, so this test does not need a JSX transform or React. It verifies the package's public entry seam, not OpenCode's actual runtime-module loader.
 
-Rendered output is not automated. Ticket 10 is the human-only in-app check; ticket 09 is the human-only remote-loading check, including the terminal machine's `cli.json` entry. Ticket 02 does not claim local in-app or remote validation, and tickets 09/10 remain open for human verification.
+Rendered output is not automated. Ticket 10 is the human-only in-app check. Ticket 09's remote-loading verification was waived by the user; automatic server-listed loading from a remote server remains unverified and must not be claimed in the README. Ticket 02 does not claim in-app validation.
 
 Prior art: `tests/support/fake-context.ts` (the server harness, which the new harness should mirror), `tests/index.test.ts` (hook and verdict tests), and `tests/package-entry.test.ts` (manifest checks).
 
@@ -116,10 +116,11 @@ Prior art: `tests/support/fake-context.ts` (the server harness, which the new ha
 - Any upstream OpenCode change.
 - Automated rendered-output tests with an OpenTUI renderer.
 - Terminal-only packages without a server half.
+- Automatic loading of a server-listed terminal entry for remote sessions; that behavior is unverified and was waived by the user.
 
 ## Further Notes
 
-- **Remote loading is unverified.** A terminal machine may not be able to load a server-listed copy of the package unless it is already installed there. The `cli.json` requirement covers this. Test it when the terminal half is built.
+- **Remote loading is unverified and waived.** The user has no remote server and does not require automatic server-listed terminal plugin loading. The local `cli.json` entry is the explicit terminal-side installation path; do not claim remote loading was tested.
 - **Glossary wording is pending.** The **Verdict** entry does not yet cover the missing-policy ask, which asks without an engine verdict. The wording is still to be decided.
 - **Superseded research.** `.scratch/branded-ask-reasons/research.md` recommended a server-only notice. That recommendation was rejected, and ADR 0004 records the decision.
 - **README changes wait for the ship.** The `cli.json` instruction and the known-limitation removal land with the terminal half, so the docs never describe a setup that does not work yet.

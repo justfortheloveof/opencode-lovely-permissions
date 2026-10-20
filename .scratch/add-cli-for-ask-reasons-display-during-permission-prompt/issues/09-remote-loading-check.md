@@ -1,4 +1,4 @@
-Status: ready-for-human
+Status: wontfix
 
 # 09: Remote loading check
 
@@ -15,4 +15,4 @@ Status: ready-for-human
 
 ## Comments
 
-- 2026-10-20: The user plans to run this check after tickets 05–08 are merged.
+- 2026-10-20: Initially deferred until tickets 05–08 were merged, then waived by the user because no remote server is available and remote CLI plugin loading is not required. Automatic server-listed loading from a remote server remains unverified and is not a release claim.
