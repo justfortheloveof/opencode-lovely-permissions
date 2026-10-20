@@ -23,4 +23,15 @@ describe("terminal plugin", () => {
       props: { children: message },
     });
   });
+
+  test("renders nothing when reading pending permissions throws", async () => {
+    const permissionsBySession = Object.defineProperty({}, "ses_broken", {
+      get() {
+        throw new Error("permission data unavailable");
+      },
+    });
+    const harness = await startTerminalPlugin(permissionsBySession);
+
+    expect(harness.render({ sessionID: "ses_broken" })).toBeNull();
+  });
 });

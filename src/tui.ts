@@ -8,11 +8,15 @@ export default Plugin.define({
     context.ui.slot({
       append: "session.composer.top",
       render: ({ sessionID }) => {
-        const asks = context.data.session.permission.list(sessionID) ?? [];
-        const message = pickAskBannerMessage(
-          asks.map(({ message }) => ({ message: message ?? "" })),
-        );
-        return message === undefined ? null : jsx("text", { children: message });
+        try {
+          const asks = context.data.session.permission.list(sessionID) ?? [];
+          const message = pickAskBannerMessage(
+            asks.map(({ message }) => ({ message: message ?? "" })),
+          );
+          return message === undefined ? null : jsx("text", { children: message });
+        } catch {
+          return null;
+        }
       },
     });
   },
