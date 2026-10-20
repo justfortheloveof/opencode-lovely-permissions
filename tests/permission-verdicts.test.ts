@@ -3,7 +3,12 @@ import { join } from "node:path";
 import { describe, expect, test } from "vite-plus/test";
 import { startPlugin, type PermissionRequest, type PluginHarness } from "./support/fake-context.ts";
 import { sandboxRoot } from "./support/sandbox.ts";
-import { stubEngine } from "./support/stub-engine.ts";
+import {
+  NEVER_ANSWERS,
+  stubEngine,
+  type StubEngine,
+  type StubReply,
+} from "./support/stub-engine.ts";
 
 type Effect = PermissionRequest["effect"];
 
@@ -15,10 +20,15 @@ function verdict(action: string, reasons: string[]) {
   return { protocol: 1, valid: true, action, reason: reasons.join("; "), reasons };
 }
 
-function engineAnswering(response: Record<string, unknown>) {
-  const engine = stubEngine(response);
+function engineAnswering(response: StubReply, byCommand?: Record<string, StubReply>) {
+  const engine = stubEngine(response, byCommand);
   process.env.LOVELY_PI_BASH_PERMISSIONS_BIN = engine.path;
   return engine;
+}
+
+/** The evaluate requests the engine received. Startup also sends one validate request, which is not counted here. */
+function evaluations(engine: StubEngine) {
+  return engine.requests().filter((request) => request.op === "evaluate");
 }
 
 function projectWithPolicy(policy: string): string {
@@ -166,4 +176,115 @@ describe("a shell call with no captured command", () => {
     });
     expect(engine.requests()).toEqual([{ op: "validate", config: {} }]);
   });
+});
+
+describe("an engine error for one command", () => {
+  const ENGINE_FAILURE = { protocol: 1, valid: false, error: "internal error: KeyError: 'op'" };
+  const ASKED = "[♡ perms: 💛 REQUIRES-USER-APPROVAL]\n- internal error: KeyError: 'op'";
+  const DENIED =
+    "[♡ perms: ❤️ auto-rejected]\n- internal error: KeyError: 'op'\nThe tool has not been run.";
+
+  test.each([
+    [
+      "takes the bash block's own error level ahead of its * and the mode's *",
+      { "*": "allow", bash: { "*": "allow", error: "deny" } },
+      { effect: "deny", message: DENIED },
+    ],
+    [
+      "takes the bash block's * when it has no error level, ahead of the mode's *",
+      { "*": "allow", bash: { "*": "deny" } },
+      { effect: "deny", message: DENIED },
+    ],
+    [
+      "takes the mode's * when the bash block sets neither",
+      { "*": "deny", bash: {} },
+      { effect: "deny", message: DENIED },
+    ],
+    ["asks when no level is set anywhere", { bash: {} }, { effect: "ask", message: ASKED }],
+    [
+      "allows when its error level is allow",
+      { "*": "deny", bash: { error: "allow", "*": "deny" } },
+      { effect: "allow", message: undefined },
+    ],
+  ])("%s", async (_, mode, expected) => {
+    const engine = engineAnswering(verdict("allow", ALLOW_REASONS), { "rm -rf /": ENGINE_FAILURE });
+    const harness = await startPlugin(projectWithPolicy(JSON.stringify({ default: mode })));
+    expect(await judge(harness, "call_engine_error", "rm -rf /", "allow")).toEqual(expected);
+    expect(evaluations(engine)).toHaveLength(1);
+  });
+
+  test("a parse failure the engine answers as a verdict is applied as the engine gave it", async () => {
+    const reason =
+      "error evaluating command (policy 'deny'): Failed to parse: 1:4: `((` can only be used to open an arithmetic cmd";
+    engineAnswering(verdict("deny", [reason]));
+    const harness = await startPlugin(
+      projectWithPolicy(JSON.stringify({ default: { "*": "ask", bash: { error: "deny" } } })),
+    );
+    expect(await judge(harness, "call_parse_failure", "((", "allow")).toEqual({
+      effect: "deny",
+      message: `[♡ perms: ❤️ auto-rejected]\n- ${reason}\nThe tool has not been run.`,
+    });
+  });
+
+  test("the next command after the failure is evaluated normally", async () => {
+    const engine = engineAnswering(verdict("allow", ALLOW_REASONS), { "rm -rf /": ENGINE_FAILURE });
+    const harness = await startPlugin(
+      projectWithPolicy(JSON.stringify({ default: { "*": "ask", bash: { error: "deny" } } })),
+    );
+    expect(await judge(harness, "call_failed_first", "rm -rf /", "allow")).toEqual({
+      effect: "deny",
+      message: DENIED,
+    });
+    expect(await judge(harness, "call_after_failure", "git status", "ask")).toEqual({
+      effect: "allow",
+      message: undefined,
+    });
+    expect(evaluations(engine).map((request) => request.command)).toEqual([
+      "rm -rf /",
+      "git status",
+    ]);
+  });
+});
+
+describe("an engine that does not answer within 5 seconds", () => {
+  const TIMED_OUT_DENIED =
+    "[♡ perms: ❤️ auto-rejected]\n- the engine did not answer within 5 seconds\nThe tool has not been run.";
+
+  test("is killed, and the command takes the bash block's error level", async () => {
+    const engine = engineAnswering(verdict("allow", ALLOW_REASONS), { "sleep 100": NEVER_ANSWERS });
+    const harness = await startPlugin(
+      projectWithPolicy(
+        JSON.stringify({ default: { "*": "allow", bash: { "*": "allow", error: "deny" } } }),
+      ),
+    );
+    expect(await judge(harness, "call_timeout", "sleep 100", "allow")).toEqual({
+      effect: "deny",
+      message: TIMED_OUT_DENIED,
+    });
+    expect(engine.hung()).toHaveLength(1);
+    const alive = (pid: number) => {
+      try {
+        process.kill(pid, 0);
+        return true;
+      } catch {
+        return false;
+      }
+    };
+    expect(alive(engine.hung()[0])).toBe(false);
+  }, 15_000);
+
+  test("the next command after the timeout is evaluated normally", async () => {
+    engineAnswering(verdict("allow", ALLOW_REASONS), { "sleep 100": NEVER_ANSWERS });
+    const harness = await startPlugin(
+      projectWithPolicy(JSON.stringify({ default: { "*": "ask", bash: { error: "deny" } } })),
+    );
+    expect(await judge(harness, "call_timed_out", "sleep 100", "allow")).toEqual({
+      effect: "deny",
+      message: TIMED_OUT_DENIED,
+    });
+    expect(await judge(harness, "call_after_timeout", "git status", "ask")).toEqual({
+      effect: "allow",
+      message: undefined,
+    });
+  }, 15_000);
 });
