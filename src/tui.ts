@@ -8,16 +8,33 @@ export default Plugin.define({
     context.ui.slot({
       append: "session.composer.top",
       render: ({ sessionID }) => {
-        return jsx("text", {
-          get children() {
-            try {
-              const asks = context.data.session.permission.list(sessionID) ?? [];
-              return pickAskBannerMessage(asks.map(({ message }) => ({ message: message ?? "" })));
-            } catch {
-              return undefined;
-            }
-          },
-        });
+        try {
+          if (context.data.session.get(sessionID)?.parentID) return null;
+
+          return jsx("text", {
+            get children() {
+              try {
+                const asks = [
+                  ...(context.data.session.permission.list(sessionID) ?? []),
+                  ...context.data.session
+                    .family(sessionID)
+                    .filter((familySessionID) => familySessionID !== sessionID)
+                    .flatMap(
+                      (familySessionID) =>
+                        context.data.session.permission.list(familySessionID) ?? [],
+                    ),
+                ];
+                return pickAskBannerMessage(
+                  asks.map(({ message }) => ({ message: message ?? "" })),
+                );
+              } catch {
+                return undefined;
+              }
+            },
+          });
+        } catch {
+          return null;
+        }
       },
     });
   },

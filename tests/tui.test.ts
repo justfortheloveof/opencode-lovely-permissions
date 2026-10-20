@@ -67,4 +67,94 @@ describe("terminal plugin", () => {
 
     expect(renderedChildren(banner)).toBeUndefined();
   });
+
+  test("renders a subagent ask in the root session's banner", async () => {
+    const message = "[♡ perms: 💛 REQUIRES-USER-APPROVAL]\n- subagent command needs approval";
+    const harness = await startTerminalPlugin(
+      {
+        ses_root: [],
+        ses_child: [{ message }],
+      },
+      {
+        sessionsByID: {
+          ses_root: {},
+          ses_child: { parentID: "ses_root" },
+        },
+        familyBySession: {
+          ses_root: ["ses_root", "ses_child"],
+        },
+      },
+    );
+
+    const banner = harness.render({ sessionID: "ses_root" });
+    expect(renderedChildren(banner)).toBe(message);
+    expect(harness.permissionLookups).toEqual(["ses_root", "ses_child"]);
+  });
+
+  test("puts the viewed session's ask before its subagent asks", async () => {
+    const ownMessage = "[♡ perms: 💛 REQUIRES-USER-APPROVAL]\n- root command needs approval";
+    const childMessage = "[♡ perms: 💛 REQUIRES-USER-APPROVAL]\n- child command needs approval";
+    const harness = await startTerminalPlugin(
+      {
+        ses_root: [{ message: ownMessage }],
+        ses_child: [{ message: childMessage }],
+      },
+      {
+        sessionsByID: {
+          ses_root: {},
+          ses_child: { parentID: "ses_root" },
+        },
+        familyBySession: {
+          ses_root: ["ses_child", "ses_root"],
+        },
+      },
+    );
+
+    const banner = harness.render({ sessionID: "ses_root" });
+    expect(renderedChildren(banner)).toBe(ownMessage);
+    expect(harness.permissionLookups).toEqual(["ses_root", "ses_child"]);
+  });
+
+  test("uses family order for subagent asks", async () => {
+    const firstMessage = "[♡ perms: 💛 REQUIRES-USER-APPROVAL]\n- first child needs approval";
+    const secondMessage = "[♡ perms: 💛 REQUIRES-USER-APPROVAL]\n- second child needs approval";
+    const harness = await startTerminalPlugin(
+      {
+        ses_root: [],
+        ses_first: [{ message: firstMessage }],
+        ses_second: [{ message: secondMessage }],
+      },
+      {
+        sessionsByID: {
+          ses_root: {},
+          ses_first: { parentID: "ses_root" },
+          ses_second: { parentID: "ses_root" },
+        },
+        familyBySession: {
+          ses_root: ["ses_root", "ses_first", "ses_second"],
+        },
+      },
+    );
+
+    const banner = harness.render({ sessionID: "ses_root" });
+    expect(renderedChildren(banner)).toBe(firstMessage);
+    expect(harness.permissionLookups).toEqual(["ses_root", "ses_first", "ses_second"]);
+  });
+
+  test("does not render a banner inside a subagent session", async () => {
+    const message = "[♡ perms: 💛 REQUIRES-USER-APPROVAL]\n- child command needs approval";
+    const harness = await startTerminalPlugin(
+      {
+        ses_child: [{ message }],
+      },
+      {
+        sessionsByID: {
+          ses_child: { parentID: "ses_root" },
+        },
+      },
+    );
+
+    expect(harness.render({ sessionID: "ses_child" })).toBeNull();
+    expect(harness.permissionLookups).toEqual([]);
+  });
 });

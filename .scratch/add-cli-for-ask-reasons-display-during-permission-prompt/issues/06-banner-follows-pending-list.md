@@ -13,4 +13,4 @@ Status: resolved
 
 ## Comments
 
-- 2026-10-20: Made the rendered text child reactive to the current pending list. The fake terminal test mutates the list and observes the same banner advance to the next ask and clear when empty. Full tests (12 files / 143 tests) and `pnpm check` passed. No OpenCode app run was performed.
+- 2026-10-20: Made the rendered text child reactive to the current pending list. The fake terminal test mutates the list and observes the same banner advance to the next ask and clear when empty. Full tests (12 files / 147 tests) and `pnpm check` passed. No OpenCode app run was performed.
