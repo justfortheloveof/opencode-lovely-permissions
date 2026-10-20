@@ -16,14 +16,29 @@ export interface Verdict {
   reasons: string[];
 }
 
+export type Validation = { valid: true } | { valid: false; error: string };
+
 /** Runs the engine once for one command line. Rejects with an EngineError when it gives no verdict. */
 export function evaluate(engine: string, request: EvaluateRequest): Promise<Verdict> {
-  const payload = {
+  return exchange(engine, {
     op: "evaluate",
     command: request.command,
     config: request.bash,
     top_level: request.topLevel,
-  };
+  }).then(verdictFrom);
+}
+
+/** Runs the engine once to check a bash block. Rejects with an EngineError when it gives no answer. */
+export async function validate(engine: string, bash: Record<string, unknown>): Promise<Validation> {
+  const answer = await exchange(engine, { op: "validate", config: bash });
+  if (answer.valid === true) return { valid: true };
+  if (answer.valid === false && typeof answer.error === "string") {
+    return { valid: false, error: answer.error };
+  }
+  throw new EngineError("the engine answered without a validation result");
+}
+
+function exchange(engine: string, payload: object): Promise<Record<string, unknown>> {
   return new Promise((resolve, reject) => {
     const child = spawn(engine, [], { stdio: ["pipe", "pipe", "pipe"] });
     let stdout = "";
@@ -39,7 +54,7 @@ export function evaluate(engine: string, request: EvaluateRequest): Promise<Verd
     });
     child.on("close", () => {
       try {
-        resolve(verdictFrom(stdout));
+        resolve(answerFrom(stdout));
       } catch (error) {
         reject(error);
       }
@@ -48,13 +63,17 @@ export function evaluate(engine: string, request: EvaluateRequest): Promise<Verd
   });
 }
 
-function verdictFrom(stdout: string): Verdict {
+function answerFrom(stdout: string): Record<string, unknown> {
   const answer = parseAnswer(stdout);
   if (answer.protocol !== PROTOCOL_VERSION) {
     throw new EngineError(
       `the engine answered with protocol ${String(answer.protocol)}; this plugin needs protocol ${PROTOCOL_VERSION}`,
     );
   }
+  return answer;
+}
+
+function verdictFrom(answer: Record<string, unknown>): Verdict {
   const { action, reason, reasons, error } = answer;
   if (typeof action !== "string" || typeof reason !== "string" || !Array.isArray(reasons)) {
     throw new EngineError(

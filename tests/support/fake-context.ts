@@ -1,6 +1,7 @@
 import type { Plugin } from "@opencode/plugin";
 import type { PermissionEvaluation } from "@opencode/plugin/promise/permission";
 import plugin from "../../src/index.ts";
+import { emptyProjectDir } from "./sandbox.ts";
 
 type Hook = (event: never) => unknown;
 
@@ -35,9 +36,10 @@ export interface PluginHarness {
 /**
  * Calls the plugin's setup with a fake context and returns the hooks it registered.
  * The fake records every registration, so a test can see what the plugin asked for
- * and drive those hooks the way OpenCode would.
+ * and drive those hooks the way OpenCode would. The project directory is the plugin
+ * location's directory, and it defaults to one with no policy in it.
  */
-export async function startPlugin(): Promise<PluginHarness> {
+export async function startPlugin(options: { directory?: string } = {}): Promise<PluginHarness> {
   const hooks = new Map<string, Hook>();
   const registered: string[] = [];
   const registration = { dispose: async () => {} };
@@ -47,6 +49,7 @@ export async function startPlugin(): Promise<PluginHarness> {
     return registration;
   };
   const context = {
+    location: { directory: options.directory ?? emptyProjectDir },
     tool: { hook: register("tool") },
     permission: { hook: register("permission") },
   } as unknown as Plugin.Context;
