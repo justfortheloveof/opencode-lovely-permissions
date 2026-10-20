@@ -11,12 +11,13 @@ export interface StubEngine {
 
 /**
  * A stand-in for `lovely-pi-bash-permissions`. Each run reads one request from
- * stdin, appends it to the record, and writes `response` to stdout.
+ * stdin, appends it to the record, and writes `response` to stdout. A string
+ * `response` is written as it is, for an engine that answers with something other than JSON.
  *
  * The shebang is the absolute Node binary, because tests run with PATH pointing
  * at an empty directory and `/usr/bin/env node` would not find Node.
  */
-export function stubEngine(response: Record<string, unknown>): StubEngine {
+export function stubEngine(response: Record<string, unknown> | string): StubEngine {
   const dir = mkdtempSync(join(sandboxRoot, "engine-"));
   const path = join(dir, "lovely-pi-bash-permissions");
   const record = join(dir, "requests.jsonl");
@@ -30,7 +31,7 @@ export function stubEngine(response: Record<string, unknown>): StubEngine {
       `process.stdin.on("data", (chunk) => { input += chunk; });`,
       `process.stdin.on("end", () => {`,
       `  appendFileSync(${JSON.stringify(record)}, JSON.stringify(JSON.parse(input)) + "\\n");`,
-      `  process.stdout.write(${JSON.stringify(`${JSON.stringify(response)}\n`)});`,
+      `  process.stdout.write(${JSON.stringify(`${typeof response === "string" ? response : JSON.stringify(response)}\n`)});`,
       `});`,
     ].join("\n"),
   );
