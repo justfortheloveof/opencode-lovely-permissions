@@ -6,6 +6,6 @@
 
 **Status:** ready-for-agent
 
-- [ ] A permission request with no captured command gets the deny effect
-- [ ] The message uses the deny label and the closing sentence, and says the command could not be matched
-- [ ] The engine is not called, checked by the stub's invocation count
+- [x] A permission request with no captured command gets the deny effect
+- [x] The message uses the deny label and the closing sentence, and says the command could not be matched
+- [x] The engine is not called, checked by the stub's invocation count
