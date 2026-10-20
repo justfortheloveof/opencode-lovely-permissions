@@ -2,9 +2,14 @@ import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, test, vi } from "vite-plus/test";
 import plugin from "../src/index.ts";
-import { startPlugin } from "./support/fake-context.ts";
+import { startPlugin, type PluginHarness } from "./support/fake-context.ts";
 import { sandboxRoot } from "./support/sandbox.ts";
-import { crashingEngine, stubEngine, type StubEngine } from "./support/stub-engine.ts";
+import {
+  crashingEngine,
+  stubEngine,
+  type StubEngine,
+  type StubReply,
+} from "./support/stub-engine.ts";
 
 const NOT_FOUND_DENIAL = [
   "[♡ perms: ❤️ auto-rejected]",
@@ -17,10 +22,20 @@ const BASH = { "*": "ask", allowed_cmds_regex: ["^git\\s+status$"] };
 const UNKNOWN_KEY_ERROR =
   "Value error, unknown bash config key 'permission'; valid keys are '*', 'allowed_cmds_regex', 'background_execution', 'blocked_cmds_regex', 'command_substitution', 'error', 'input_redirection', 'output_redirection', 'process_substitution', 'subshell', 'variable_assignment'";
 
-function useEngine(response: Record<string, unknown> | string): StubEngine {
-  const engine = stubEngine(response);
+const BAD_LEVEL_ERROR = "*: Input should be 'allow', 'deny' or 'ask' (got 'alow')";
+
+function useEngine(
+  response: Record<string, unknown> | string,
+  byConfig: Record<string, StubReply> = {},
+): StubEngine {
+  const engine = stubEngine(response, {}, byConfig);
   process.env.LOVELY_PI_BASH_PERMISSIONS_BIN = engine.path;
   return engine;
+}
+
+/** Validate replies that reject one bash block, keyed the way the stub matches them. */
+function rejecting(bash: Record<string, unknown>, error: string): Record<string, StubReply> {
+  return { [JSON.stringify(bash)]: { protocol: 1, valid: false, error } };
 }
 
 function projectWith(policy: unknown): string {
@@ -84,7 +99,10 @@ describe("when the policy is valid", () => {
   test("setup sends the default mode's bash block to the engine's validate operation", async () => {
     const engine = useEngine({ protocol: 1, valid: true });
     await startPlugin(projectWith({ default: { bash: BASH } }));
-    expect(engine.requests()).toEqual([{ op: "validate", config: BASH }]);
+    expect(engine.requests()).toEqual([
+      { op: "validate", config: BASH },
+      { op: "validate", config: BASH },
+    ]);
   });
 
   test("the bash block sent is merged from the global and project files", async () => {
@@ -99,6 +117,8 @@ describe("when the policy is valid", () => {
       projectWith({ default: { bash: { allowed_cmds_regex: ["^git\\s+status$"] } } }),
     );
     expect(engine.requests()).toEqual([
+      { op: "validate", config: { "*": "ask", subshell: "deny" } },
+      { op: "validate", config: { allowed_cmds_regex: ["^git\\s+status$"] } },
       {
         op: "validate",
         config: { "*": "ask", subshell: "deny", allowed_cmds_regex: ["^git\\s+status$"] },
@@ -145,13 +165,97 @@ describe("when the policy is valid", () => {
   });
 });
 
+describe("when the mode option is set", () => {
+  const ALLOWED = {
+    protocol: 1,
+    valid: true,
+    action: "allow",
+    reason: "allowed",
+    reasons: ["allowed"],
+  };
+  const STRICT = { "*": "deny", allowed_cmds_regex: ["^ls$"] };
+  const UNKNOWN_MODE_DENIAL = [
+    "[♡ perms: ❤️ auto-rejected]",
+    '- the mode option selects "strict", but no policy file defines that mode. The modes that exist are: "default", "personal". Set the mode option to one of them, then restart OpenCode.',
+    "The tool has not been run.",
+  ].join("\n");
+
+  function policyWithStrict(): string {
+    return projectWith({
+      default: { "*": "ask", bash: BASH },
+      personal: { "*": "allow" },
+      strict: { "*": "deny", bash: STRICT },
+    });
+  }
+
+  async function runCall(harness: PluginHarness, id: string, command: string) {
+    await harness.startCall({ tool: "shell", id, input: { command } });
+    return harness.evaluate({
+      action: "shell",
+      resources: [command],
+      effect: "allow",
+      source: { type: "tool", messageID: "msg_test", id },
+    });
+  }
+
+  test("the named mode's bash block and wildcard are sent to the engine with each shell call", async () => {
+    const engine = useEngine(ALLOWED);
+    const harness = await startPlugin(policyWithStrict(), { mode: "strict" });
+    await runCall(harness, "call_strict", "ls");
+    expect(engine.requests()).toContainEqual({ op: "validate", config: STRICT });
+    expect(engine.requests().filter((request) => request.op === "evaluate")).toEqual([
+      { op: "evaluate", command: "ls", config: STRICT, top_level: "deny" },
+    ]);
+  });
+
+  test("with no mode option, the default mode is used", async () => {
+    const engine = useEngine(ALLOWED);
+    const harness = await startPlugin(policyWithStrict());
+    await runCall(harness, "call_default", "ls");
+    expect(engine.requests().filter((request) => request.op === "evaluate")).toEqual([
+      { op: "evaluate", command: "ls", config: BASH, top_level: "ask" },
+    ]);
+  });
+
+  test("the mode is read once at setup, so changing the option afterwards has no effect", async () => {
+    const engine = useEngine(ALLOWED);
+    const options: Record<string, unknown> = { mode: "default" };
+    const harness = await startPlugin(policyWithStrict(), options);
+    options.mode = "strict";
+    await runCall(harness, "call_after_change", "ls");
+    expect(engine.requests().filter((request) => request.op === "evaluate")).toEqual([
+      { op: "evaluate", command: "ls", config: BASH, top_level: "ask" },
+    ]);
+  });
+
+  test("a selected mode that does not exist denies every shell call, naming the mode and listing the modes that exist", async () => {
+    const engine = useEngine(ALLOWED);
+    const harness = await startPlugin(
+      projectWith({ default: { bash: BASH }, personal: { "*": "allow" } }),
+      { mode: "strict" },
+    );
+    await expect(
+      harness.evaluate({ action: "shell", resources: ["git status"], effect: "allow" }),
+    ).resolves.toEqual({ effect: "deny", message: UNKNOWN_MODE_DENIAL });
+    await expect(
+      harness.evaluate({ action: "shell", resources: ["rm -rf /"], effect: "ask" }),
+    ).resolves.toEqual({ effect: "deny", message: UNKNOWN_MODE_DENIAL });
+    await expect(
+      harness.evaluate({ action: "read", resources: ["/etc/hosts"], effect: "allow" }),
+    ).resolves.toEqual({ effect: "allow", message: undefined });
+    expect(engine.requests()).toEqual([]);
+  });
+});
+
 describe("when the engine rejects the policy", () => {
-  test("an unknown key denies every shell call, naming the key and listing the valid keys", async () => {
+  test("an unknown key denies every shell call, naming the file, the key, and the valid keys", async () => {
     useEngine({ protocol: 1, valid: false, error: UNKNOWN_KEY_ERROR });
-    const harness = await startPlugin(projectWith({ default: { bash: { permission: "allow" } } }));
+    const project = projectWith({ default: { bash: { permission: "allow" } } });
+    const file = join(project, ".opencode", "lovely-permissions.jsonc");
+    const harness = await startPlugin(project);
     const denial = [
       "[♡ perms: ❤️ auto-rejected]",
-      `- the bash engine rejected the policy: ${UNKNOWN_KEY_ERROR}. Fix what it names, then restart OpenCode.`,
+      `- the bash engine rejected the policy file ${file}: ${UNKNOWN_KEY_ERROR}. Fix what it names, then restart OpenCode.`,
       "The tool has not been run.",
     ].join("\n");
     await expect(
@@ -165,20 +269,61 @@ describe("when the engine rejects the policy", () => {
     ).resolves.toEqual({ effect: "allow", message: undefined });
   });
 
-  test("a bad level value denies every shell call, naming the key", async () => {
-    useEngine({
-      protocol: 1,
-      valid: false,
-      error: "*: Input should be 'allow', 'deny' or 'ask' (got 'alow')",
-    });
-    const harness = await startPlugin(projectWith({ default: { bash: { "*": "alow" } } }));
+  test("a bad level value denies every shell call, naming the file and the key", async () => {
+    useEngine({ protocol: 1, valid: false, error: BAD_LEVEL_ERROR });
+    const project = projectWith({ default: { bash: { "*": "alow" } } });
+    const file = join(project, ".opencode", "lovely-permissions.jsonc");
+    const harness = await startPlugin(project);
     await expect(
       harness.evaluate({ action: "shell", resources: ["git status"], effect: "allow" }),
     ).resolves.toEqual({
       effect: "deny",
       message: [
         "[♡ perms: ❤️ auto-rejected]",
-        "- the bash engine rejected the policy: *: Input should be 'allow', 'deny' or 'ask' (got 'alow'). Fix what it names, then restart OpenCode.",
+        `- the bash engine rejected the policy file ${file}: ${BAD_LEVEL_ERROR}. Fix what it names, then restart OpenCode.`,
+        "The tool has not been run.",
+      ].join("\n"),
+    });
+  });
+
+  test("the file a rejected key came from is named, even when a later file overrides that key", async () => {
+    const globalDir = mkdtempSync(join(sandboxRoot, "global-"));
+    const globalFile = join(globalDir, "lovely-permissions.jsonc");
+    writeFileSync(globalFile, JSON.stringify({ default: { bash: { "*": "alow" } } }));
+    process.env.OPENCODE_CONFIG_DIR = globalDir;
+    useEngine({ protocol: 1, valid: true }, rejecting({ "*": "alow" }, BAD_LEVEL_ERROR));
+    const harness = await startPlugin(projectWith({ default: { bash: { "*": "deny" } } }));
+    await expect(
+      harness.evaluate({ action: "shell", resources: ["git status"], effect: "allow" }),
+    ).resolves.toEqual({
+      effect: "deny",
+      message: [
+        "[♡ perms: ❤️ auto-rejected]",
+        `- the bash engine rejected the policy file ${globalFile}: ${BAD_LEVEL_ERROR}. Fix what it names, then restart OpenCode.`,
+        "The tool has not been run.",
+      ].join("\n"),
+    });
+  });
+
+  test("a merged block the engine rejects, though each file passes on its own, names the files it merges", async () => {
+    const globalDir = mkdtempSync(join(sandboxRoot, "global-"));
+    const globalFile = join(globalDir, "lovely-permissions.jsonc");
+    writeFileSync(globalFile, JSON.stringify({ default: { bash: { "*": "ask" } } }));
+    process.env.OPENCODE_CONFIG_DIR = globalDir;
+    const project = projectWith({ default: { bash: { subshell: "deny" } } });
+    const projectFile = join(project, ".opencode", "lovely-permissions.jsonc");
+    useEngine(
+      { protocol: 1, valid: true },
+      rejecting({ "*": "ask", subshell: "deny" }, "the merged block is inconsistent"),
+    );
+    const harness = await startPlugin(project);
+    await expect(
+      harness.evaluate({ action: "shell", resources: ["git status"], effect: "allow" }),
+    ).resolves.toEqual({
+      effect: "deny",
+      message: [
+        "[♡ perms: ❤️ auto-rejected]",
+        `- the bash engine rejected the merged policy from ${globalFile} and ${projectFile}: the merged block is inconsistent. Fix what it names, then restart OpenCode.`,
         "The tool has not been run.",
       ].join("\n"),
     });
@@ -186,6 +331,43 @@ describe("when the engine rejects the policy", () => {
 });
 
 describe("when the policy file cannot be read or parsed", () => {
+  test("a file that cannot be parsed denies every shell call, naming the file", async () => {
+    useEngine({ protocol: 1, valid: true });
+    const directory = mkdtempSync(join(sandboxRoot, "project-"));
+    mkdirSync(join(directory, ".opencode"));
+    const file = join(directory, ".opencode", "lovely-permissions.jsonc");
+    writeFileSync(file, `{ "default": { "*": "ask", `);
+    const harness = await startPlugin(directory);
+    await expect(
+      harness.evaluate({ action: "shell", resources: ["git status"], effect: "allow" }),
+    ).resolves.toEqual({
+      effect: "deny",
+      message: [
+        "[♡ perms: ❤️ auto-rejected]",
+        `- the policy file ${file} could not be used: PropertyNameExpected at line 1. Fix the file and restart OpenCode.`,
+        "The tool has not been run.",
+      ].join("\n"),
+    });
+  });
+
+  test("a file that cannot be read denies every shell call, naming the file", async () => {
+    useEngine({ protocol: 1, valid: true });
+    const directory = mkdtempSync(join(sandboxRoot, "project-"));
+    const file = join(directory, ".opencode", "lovely-permissions.jsonc");
+    mkdirSync(file, { recursive: true });
+    const harness = await startPlugin(directory);
+    await expect(
+      harness.evaluate({ action: "shell", resources: ["git status"], effect: "allow" }),
+    ).resolves.toEqual({
+      effect: "deny",
+      message: [
+        "[♡ perms: ❤️ auto-rejected]",
+        `- the policy file ${file} could not be used: it could not be read: EISDIR: illegal operation on a directory, read. Fix the file and restart OpenCode.`,
+        "The tool has not been run.",
+      ].join("\n"),
+    });
+  });
+
   test("a file with no default mode denies every shell call, naming the file", async () => {
     useEngine({ protocol: 1, valid: true });
     const directory = projectWith({ build: { bash: BASH } });

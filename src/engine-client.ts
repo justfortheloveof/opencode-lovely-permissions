@@ -17,7 +17,7 @@ export class ProtocolMismatchError extends EngineError {
 export interface EvaluateRequest {
   command: string;
   bash: Record<string, unknown>;
-  topLevel: unknown;
+  topLevel: string;
 }
 
 export interface Verdict {

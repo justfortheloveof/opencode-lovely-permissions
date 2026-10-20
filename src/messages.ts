@@ -21,8 +21,15 @@ export function invalidPolicyReason(file: string, reason: string): string {
   return `the policy file ${file} could not be used: ${reason}. Fix the file and restart OpenCode.`;
 }
 
-export function rejectedPolicyReason(error: string): string {
-  return `the bash engine rejected the policy: ${error}. Fix what it names, then restart OpenCode.`;
+export function rejectedPolicyReason(files: readonly string[], error: string): string {
+  return `the bash engine rejected ${rejectedSource(files)}: ${error}. Fix what it names, then restart OpenCode.`;
+}
+
+/** Names the file a rejected block came from, or the files it was merged from. */
+function rejectedSource(files: readonly string[]): string {
+  if (files.length === 0) return "the policy";
+  if (files.length === 1) return `the policy file ${files[0]}`;
+  return `the merged policy from ${files.join(" and ")}`;
 }
 
 export function engineUnusableReason(detail: string): string {

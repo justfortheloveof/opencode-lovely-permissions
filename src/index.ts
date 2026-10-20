@@ -3,27 +3,31 @@ import type { PermissionEvaluation } from "@opencode/plugin/promise/permission";
 import { commandFor, forgetCommand, recordCommand } from "./command-capture.ts";
 import { EngineError, evaluate, type Verdict } from "./engine-client.ts";
 import { resolveEngine } from "./engine.ts";
-import { fallbackLevel } from "./fallback.ts";
+import { fallbackLevel, levelOf } from "./fallback.ts";
 import { askMessage, denyMessage, noPolicyMessage, UNMATCHED_REASON } from "./messages.ts";
+import { selectMode } from "./mode.ts";
 import { DEFAULT_MODE, type ModePolicy } from "./policy-file.ts";
-import { policyLocations, readLayeredPolicy } from "./policy-layers.ts";
+import { bashSources, policyLocations, readLayeredPolicy } from "./policy-layers.ts";
 import { checkStartup } from "./startup.ts";
 
 const SHELL_ACTION = "shell";
-/** Stands in for the mode when there is no valid policy. The engine is never asked for a verdict then. */
-const NO_MODE: ModePolicy = { bash: {}, wildcard: undefined };
 
 export default Plugin.define({
   id: "lovely-bash-permissions",
   async setup(ctx) {
     const engine = resolveEngine();
-    const policy = await readLayeredPolicy(ctx.location.directory);
+    const directory = ctx.location.directory;
+    const mode = String(ctx.options.mode ?? DEFAULT_MODE);
+    const policy = await readLayeredPolicy(directory);
     if (policy.status === "valid") {
       for (const warning of policy.warnings) console.warn(warning);
     }
-    const mode = policy.status === "valid" ? policy.modes[DEFAULT_MODE] : NO_MODE;
-    const startup = await checkStartup(engine, policy, mode);
-    const locations = policyLocations(ctx.location.directory);
+    const startup = await checkStartup(
+      engine,
+      selectMode(policy, mode),
+      await bashSources(directory, mode),
+    );
+    const locations = policyLocations(directory);
 
     await ctx.tool.hook("execute.before", recordCommand);
     await ctx.tool.hook("execute.after", forgetCommand);
@@ -34,7 +38,7 @@ export default Plugin.define({
         return;
       }
       if (event.effect === "deny") return;
-      if (policy.status === "absent") {
+      if (startup.status === "no-policy") {
         event.effect = "ask";
         event.message = noPolicyMessage(locations);
         return;
@@ -44,14 +48,18 @@ export default Plugin.define({
         deny(event, denyMessage([UNMATCHED_REASON]));
         return;
       }
-      applyVerdict(event, await verdictFor(startup.engine, command, mode));
+      applyVerdict(event, await verdictFor(startup.engine, command, startup.mode));
     });
   },
 });
 
 async function verdictFor(engine: string, command: string, mode: ModePolicy): Promise<Verdict> {
   try {
-    return await evaluate(engine, { command, bash: mode.bash, topLevel: mode.wildcard });
+    return await evaluate(engine, {
+      command,
+      bash: mode.bash,
+      topLevel: levelOf(mode.wildcard),
+    });
   } catch (error) {
     if (!(error instanceof EngineError)) throw error;
     return {

@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, beforeEach, expect, test } from "vite-plus/test";
 import { selectMode } from "../src/mode.ts";
+import { readLayeredPolicy } from "../src/policy-layers.ts";
 
 const ENV_KEYS = ["HOME", "XDG_CONFIG_HOME", "OPENCODE_CONFIG_DIR"] as const;
 
@@ -41,7 +42,7 @@ async function writeAt(file: string, content: string) {
   await writeFile(file, content);
 }
 
-test("with no mode option, the default mode's bash block and wildcard are selected", async () => {
+test("the default mode's bash block and wildcard are selected by name", async () => {
   await writeAt(
     projectFile,
     JSON.stringify({
@@ -50,7 +51,7 @@ test("with no mode option, the default mode's bash block and wildcard are select
     }),
   );
 
-  expect(await selectMode(project, undefined)).toEqual({
+  expect(selectMode(await readLayeredPolicy(project), "default")).toEqual({
     status: "valid",
     mode: "default",
     bash: { "*": "deny", allowed_cmds_regex: ["^git\\s+status$"] },
@@ -67,7 +68,7 @@ test("a named mode that exists selects that mode's bash block and wildcard", asy
     }),
   );
 
-  expect(await selectMode(project, "strict")).toEqual({
+  expect(selectMode(await readLayeredPolicy(project), "strict")).toEqual({
     status: "valid",
     mode: "strict",
     bash: { "*": "deny", subshell: "allow" },
@@ -79,7 +80,7 @@ test("a mode defined only in the global file can be selected", async () => {
   await writeAt(globalFile, JSON.stringify({ default: {}, personal: { "*": "allow" } }));
   await writeAt(projectFile, JSON.stringify({ default: { "*": "ask" } }));
 
-  expect(await selectMode(project, "personal")).toEqual({
+  expect(selectMode(await readLayeredPolicy(project), "personal")).toEqual({
     status: "valid",
     mode: "personal",
     bash: {},
@@ -93,7 +94,7 @@ test("a selected mode that does not exist is invalid, naming the mode and listin
     JSON.stringify({ default: { "*": "ask" }, personal: { "*": "allow" } }),
   );
 
-  expect(await selectMode(project, "strict")).toEqual({
+  expect(selectMode(await readLayeredPolicy(project), "strict")).toEqual({
     status: "unknown-mode",
     mode: "strict",
     modes: ["default", "personal"],
@@ -105,7 +106,7 @@ test("a selected mode that does not exist is invalid, naming the mode and listin
 test("a mode name that only exists as an Object property is not a mode", async () => {
   await writeAt(projectFile, JSON.stringify({ default: { "*": "ask" } }));
 
-  expect(await selectMode(project, "constructor")).toMatchObject({
+  expect(selectMode(await readLayeredPolicy(project), "constructor")).toMatchObject({
     status: "unknown-mode",
     mode: "constructor",
   });
@@ -114,12 +115,12 @@ test("a mode name that only exists as an Object property is not a mode", async (
 test("a file with no default mode is invalid, and the file is named", async () => {
   await writeAt(projectFile, JSON.stringify({ strict: { "*": "deny" } }));
 
-  expect(await selectMode(project, undefined)).toMatchObject({
+  expect(selectMode(await readLayeredPolicy(project), "default")).toMatchObject({
     status: "invalid",
     file: projectFile,
   });
 });
 
 test("no policy file is absent", async () => {
-  expect(await selectMode(project, undefined)).toEqual({ status: "absent" });
+  expect(selectMode(await readLayeredPolicy(project), "default")).toEqual({ status: "absent" });
 });

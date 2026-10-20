@@ -21,6 +21,7 @@ export type StubReply = Record<string, unknown> | string | typeof NEVER_ANSWERS;
  * A stand-in for `lovely-pi-bash-permissions`. Each run reads one request from
  * stdin, appends it to the record, and writes the reply for its command to stdout.
  * `byCommand` gives specific command lines their own reply, and `reply` answers every other one.
+ * `byConfig` does the same for validate requests, keyed by the JSON text of the bash block.
  * A string reply is written as it is, for an engine that answers with something other than JSON.
  *
  * The shebang is the absolute Node binary, because tests run with PATH pointing
@@ -29,12 +30,12 @@ export type StubReply = Record<string, unknown> | string | typeof NEVER_ANSWERS;
 export function stubEngine(
   reply: StubReply,
   byCommand: Record<string, StubReply> = {},
+  byConfig: Record<string, StubReply> = {},
 ): StubEngine {
   const outputs = {
     fallback: render(reply),
-    byCommand: Object.fromEntries(
-      Object.entries(byCommand).map(([command, value]) => [command, render(value)]),
-    ),
+    byCommand: renderAll(byCommand),
+    byConfig: renderAll(byConfig),
   };
   return writeStub((record, hung) => [
     `const { appendFileSync } = require("node:fs");`,
@@ -45,7 +46,9 @@ export function stubEngine(
     `process.stdin.on("end", () => {`,
     `  const request = JSON.parse(input);`,
     `  appendFileSync(${JSON.stringify(record)}, JSON.stringify(request) + "\\n");`,
-    `  const output = Object.hasOwn(outputs.byCommand, request.command) ? outputs.byCommand[request.command] : outputs.fallback;`,
+    `  const replies = request.op === "validate" ? outputs.byConfig : outputs.byCommand;`,
+    `  const key = request.op === "validate" ? JSON.stringify(request.config) : request.command;`,
+    `  const output = Object.hasOwn(replies, key) ? replies[key] : outputs.fallback;`,
     `  if (output === null) {`,
     `    appendFileSync(${JSON.stringify(hung)}, process.pid + "\\n");`,
     `    setTimeout(() => {}, 30000);`,
@@ -76,6 +79,10 @@ function writeStub(body: (record: string, hung: string) => string[]): StubEngine
     requests: () => readLines(record).map((line) => JSON.parse(line) as Record<string, unknown>),
     hung: () => readLines(hung).map(Number),
   };
+}
+
+function renderAll(replies: Record<string, StubReply>): Record<string, string | null> {
+  return Object.fromEntries(Object.entries(replies).map(([key, value]) => [key, render(value)]));
 }
 
 function render(reply: StubReply): string | null {

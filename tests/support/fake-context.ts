@@ -38,9 +38,13 @@ export interface PluginHarness {
  * Calls the plugin's setup with a fake context and returns the hooks it registered.
  * The fake records every registration, so a test can see what the plugin asked for
  * and drive those hooks the way OpenCode would. The plugin reads its project policy
- * from `directory`, which is empty unless a test passes one.
+ * from `directory`, which is empty unless a test passes one. `options` are the plugin
+ * options OpenCode would pass, and the same object is what the plugin sees in setup.
  */
-export async function startPlugin(directory: string = emptyProjectDir): Promise<PluginHarness> {
+export async function startPlugin(
+  directory: string = emptyProjectDir,
+  options: Record<string, unknown> = {},
+): Promise<PluginHarness> {
   const hooks = new Map<string, Hook>();
   const registered: string[] = [];
   const registration = { dispose: async () => {} };
@@ -51,6 +55,7 @@ export async function startPlugin(directory: string = emptyProjectDir): Promise<
   };
   const context = {
     location: { directory },
+    options,
     tool: { hook: register("tool") },
     permission: { hook: register("permission") },
   } as unknown as Plugin.Context;

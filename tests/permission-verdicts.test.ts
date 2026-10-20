@@ -130,9 +130,29 @@ describe("the engine request", () => {
     await judge(harness, "call_request", command, "ask");
     expect(engine.requests()).toEqual([
       { op: "validate", config: bash },
+      { op: "validate", config: bash },
       { op: "evaluate", command, config: bash, top_level: "allow" },
     ]);
   });
+
+  test.each([
+    ["has no * of its own", {}, "ask"],
+    ["sets * to deny", { "*": "deny" }, "deny"],
+    ["sets * to something that is not a level", { "*": "alow" }, "ask"],
+  ])(
+    "sends the mode's * as the top level when it is a level, and ask otherwise: a mode that %s",
+    async (_, wildcard, topLevel) => {
+      const engine = engineAnswering(verdict("allow", ALLOW_REASONS));
+      const bash = { allowed_cmds_regex: ["^git\\s+status$"] };
+      const harness = await startPlugin(
+        projectWithPolicy(JSON.stringify({ default: { ...wildcard, bash } })),
+      );
+      await judge(harness, "call_top_level", "git status", "ask");
+      expect(evaluations(engine)).toEqual([
+        { op: "evaluate", command: "git status", config: bash, top_level: topLevel },
+      ]);
+    },
+  );
 
   test("with no policy file, setup checks the engine with an empty bash block, and a shell call is not sent to it", async () => {
     const engine = engineAnswering(verdict("ask", ASK_REASONS));
@@ -248,7 +268,10 @@ describe("a shell call with no captured command", () => {
       message:
         "[♡ perms: ❤️ auto-rejected]\n- the command could not be matched to its tool call\nThe tool has not been run.",
     });
-    expect(engine.requests()).toEqual([{ op: "validate", config: {} }]);
+    expect(engine.requests()).toEqual([
+      { op: "validate", config: {} },
+      { op: "validate", config: {} },
+    ]);
   });
 });
 

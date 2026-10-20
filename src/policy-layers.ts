@@ -22,6 +22,11 @@ export interface PolicyLocations {
   local: string;
 }
 
+export interface BashSource {
+  file: string;
+  bash: Record<string, unknown>;
+}
+
 /** Where the three policy files live for a project. Later files win over earlier ones. */
 export function policyLocations(directory: string): PolicyLocations {
   const projectDirectory = join(directory, ".opencode");
@@ -30,6 +35,22 @@ export function policyLocations(directory: string): PolicyLocations {
     project: join(projectDirectory, POLICY_FILE_NAME),
     local: join(projectDirectory, LOCAL_POLICY_FILE_NAME),
   };
+}
+
+/**
+ * The bash block each policy file gives `mode`, in merge order, so that a block the
+ * engine rejects can be blamed on the file it came from.
+ */
+export async function bashSources(directory: string, mode: string): Promise<BashSource[]> {
+  const { global, project, local } = policyLocations(directory);
+  const sources: BashSource[] = [];
+  for (const file of [global, project, local]) {
+    const policy = await readPolicyFile(file);
+    if (policy.status !== "valid" || !Object.hasOwn(policy.modes, mode)) continue;
+    const bash = policy.modes[mode].bash;
+    if (isRecord(bash)) sources.push({ file, bash });
+  }
+  return sources;
 }
 
 export async function readLayeredPolicy(directory: string): Promise<LayeredPolicy> {

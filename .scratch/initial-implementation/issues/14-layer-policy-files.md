@@ -8,7 +8,7 @@
 
 - [x] The local file overrides the project file, which overrides the global file, per mode name
 - [x] Objects merge recursively, and arrays concatenate in file order
-- [ ] A file that cannot be read or parsed denies every shell call, with a message naming the file
-- [ ] A file the engine rejects denies every shell call, naming the file and the key
+- [x] A file that cannot be read or parsed denies every shell call, with a message naming the file
+- [x] A file the engine rejects denies every shell call, naming the file and the key
 - [x] The global file is read from the location confirmed in ticket 04
 - [x] A missing file is not an error here; ticket 15 handles the case where no file exists
