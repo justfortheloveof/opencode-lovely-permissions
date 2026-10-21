@@ -194,5 +194,16 @@ describe("terminal plugin", () => {
 
     expect(harness.render({ sessionID: "ses_child" })).toBeNull();
     expect(harness.permissionLookups).toEqual([]);
+    expect(harness.permissionSyncs).toEqual([]);
+  });
+
+  test("removes the composer slot when the terminal plugin is disposed", async () => {
+    const harness = await startTerminalPlugin({});
+
+    await harness.dispose();
+
+    expect(() => harness.render({ sessionID: "ses_viewed" })).toThrow(
+      "the plugin did not register session.composer.top",
+    );
   });
 });

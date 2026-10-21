@@ -32,6 +32,8 @@ export interface TerminalPluginHarness {
   readonly permissionSyncs: string[];
   /** Runs the registered composer-top slot with the host-provided input. */
   render(input: SlotInput): unknown;
+  /** Runs the terminal plugin's cleanup hook. */
+  dispose(): Promise<void>;
 }
 
 interface SessionState {
@@ -86,12 +88,17 @@ export async function startTerminalPlugin(
       slot(claim: SlotClaim) {
         registered.push(claim.append);
         slots.push({ path: claim.append, render: claim.render });
-        return () => {};
+        return () => {
+          const index = slots.findIndex(
+            ({ path, render }) => path === claim.append && render === claim.render,
+          );
+          if (index !== -1) slots.splice(index, 1);
+        };
       },
     },
   } as unknown as Plugin.Context;
 
-  await tuiPlugin.setup(context);
+  const cleanup = await tuiPlugin.setup(context);
 
   return {
     registered,
@@ -101,6 +108,9 @@ export async function startTerminalPlugin(
       const slot = slots.find(({ path }) => path === "session.composer.top");
       if (slot === undefined) throw new Error("the plugin did not register session.composer.top");
       return slot.render(input);
+    },
+    async dispose() {
+      if (typeof cleanup === "function") await cleanup();
     },
   };
 }

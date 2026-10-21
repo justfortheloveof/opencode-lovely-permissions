@@ -2,7 +2,7 @@
 
 An OpenCode plugin that checks every shell command the agent runs against your bash policy before it runs. The policy uses the same vocabulary as the Pi and Devin clients, and the decisions come from the same bash engine.
 
-The plugin targets the OpenCode V2 plugin API, pinned to `@opencode/plugin` 2.0.30.
+The plugin targets the OpenCode V2 plugin API, pinned to `@opencode/plugin` 2.1.1. Its CLI banner uses OpenTUI 0.6.6 or newer; OpenTUI 0.5.x hosts are no longer claimed as supported.
 
 ## What it does
 

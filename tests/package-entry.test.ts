@@ -34,8 +34,8 @@ describe("package entry", () => {
 
   test("terminal rendering dependencies are optional peers", () => {
     expect(manifest.peerDependencies).toEqual({
-      "@opentui/core": ">=0.5.17",
-      "@opentui/solid": ">=0.5.17",
+      "@opentui/core": ">=0.6.6",
+      "@opentui/solid": ">=0.6.6",
       "solid-js": ">=1.9.0",
     });
     expect(manifest.peerDependenciesMeta).toEqual({
@@ -43,5 +43,12 @@ describe("package entry", () => {
       "@opentui/solid": { optional: true },
       "solid-js": { optional: true },
     });
+  });
+
+  test("targets the current OpenCode and terminal rendering dependencies", () => {
+    expect(manifest.dependencies["@opencode/plugin"]).toBe("2.1.1");
+    expect(manifest.devDependencies["@opentui/core"]).toBe("0.6.6");
+    expect(manifest.devDependencies["@opentui/solid"]).toBe("0.6.6");
+    expect(manifest.devDependencies["solid-js"]).toBe("1.9.15");
   });
 });
