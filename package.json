@@ -5,6 +5,7 @@
   "license": "MIT",
   "files": [
     "index.ts",
+    "tui.ts",
     "src"
   ],
   "type": "module",

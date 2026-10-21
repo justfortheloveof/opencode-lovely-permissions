@@ -1,10 +1,13 @@
 import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { describe, expect, test } from "vite-plus/test";
+import { Host } from "@opencode/plugin/host";
 import tuiPlugin from "opencode-lovely-bash-permissions/tui";
 import rootEntry from "../index.ts";
 import plugin from "../src/index.ts";
 
 const manifest = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf-8"));
+const packageDirectory = fileURLToPath(new URL("../", import.meta.url));
 
 describe("package entry", () => {
   test("the package root loads the plugin, so a path to the package directory loads it", () => {
@@ -19,6 +22,14 @@ describe("package entry", () => {
     expect(manifest.exports["./tui"]).toBe("./src/tui.ts");
     expect(manifest.files).toContain("src");
     expect(tuiPlugin.id).toBe("lovely-bash-permissions");
+  });
+
+  test("a local package directory resolves its terminal entry through the host", () => {
+    const entries = Host.resolve({ directory: packageDirectory });
+
+    expect(entries.tui).toBe(new URL("../tui.ts", import.meta.url).href);
+    expect(manifest.files).toContain("tui.ts");
+    expect(manifest.exports["./tui"]).toBe("./src/tui.ts");
   });
 
   test("terminal rendering dependencies are optional peers", () => {
