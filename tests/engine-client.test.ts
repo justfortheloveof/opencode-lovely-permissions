@@ -2,7 +2,7 @@ import { join } from "node:path";
 import { describe, expect, test } from "bun:test";
 import { EngineError, evaluate, validate, type EvaluateRequest } from "../src/engine-client.ts";
 import { sandboxRoot } from "./support/sandbox.ts";
-import { stubEngine } from "../tests/support/stub-engine.ts";
+import { stubEngine } from "./support/stub-engine.ts";
 
 const ALLOW = {
   protocol: 1,

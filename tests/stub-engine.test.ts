@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { describe, expect, test } from "bun:test";
-import { stubEngine } from "../tests/support/stub-engine.ts";
+import { stubEngine } from "./support/stub-engine.ts";
 
 const RESPONSE = { protocol: 1, action: "allow", reason: "", reasons: [] };
 const REQUEST = { op: "evaluate", command: "git status", config: {}, top_level: "ask" };

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { startTerminalPlugin } from "../tests/support/fake-terminal-context.ts";
+import { startTerminalPlugin } from "./support/fake-terminal-context.ts";
 import { withTestRender } from "./support/test-render.ts";
 
 function visibleText(frame: string): string {

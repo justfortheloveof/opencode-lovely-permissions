@@ -2,15 +2,10 @@ import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, spyOn, test } from "bun:test";
 import plugin from "../src/index.ts";
-import { judge, startPlugin } from "../tests/support/fake-context.ts";
-import { projectWith, projectWithText } from "../tests/support/project.ts";
+import { judge, startPlugin } from "./support/fake-context.ts";
+import { projectWith, projectWithText } from "./support/project.ts";
 import { sandboxRoot } from "./support/sandbox.ts";
-import {
-  crashingEngine,
-  evaluations,
-  useEngine,
-  type StubReply,
-} from "../tests/support/stub-engine.ts";
+import { crashingEngine, evaluations, useEngine, type StubReply } from "./support/stub-engine.ts";
 
 const NOT_FOUND_DENIAL = [
   "[♡ perms: ❤️ auto-rejected]",

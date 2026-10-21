@@ -4,7 +4,7 @@ import { dirname, join } from "node:path";
 import { afterEach, beforeEach, expect, test } from "bun:test";
 import { policyLocations } from "../src/policy-locations.ts";
 import { restoreEnvAfterEach } from "./support/env.ts";
-import { readLayeredPolicy } from "../tests/support/project.ts";
+import { readLayeredPolicy } from "./support/project.ts";
 
 restoreEnvAfterEach(["HOME", "XDG_CONFIG_HOME", "OPENCODE_CONFIG_DIR"]);
 

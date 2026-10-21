@@ -11,7 +11,7 @@ void mock.module("../src/ask-banner.ts", () => ({
 
 describe("terminal plugin failures", () => {
   test("renders nothing when the banner rule throws", async () => {
-    const { startTerminalPlugin } = await import("../tests/support/fake-terminal-context.ts");
+    const { startTerminalPlugin } = await import("./support/fake-terminal-context.ts");
     const harness = await startTerminalPlugin({
       ses_viewed: [{ message: `${ASK_LABEL}\n- a reason` }],
     });

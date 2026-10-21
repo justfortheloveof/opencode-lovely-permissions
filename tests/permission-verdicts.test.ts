@@ -1,11 +1,11 @@
 import { mkdirSync, mkdtempSync } from "node:fs";
 import { join } from "node:path";
 import { beforeEach, describe, expect, test } from "bun:test";
-import { judge, startPlugin, type PermissionDecision } from "../tests/support/fake-context.ts";
+import { judge, startPlugin, type PermissionDecision } from "./support/fake-context.ts";
 import { restoreEnvAfterEach } from "./support/env.ts";
-import { projectWith } from "../tests/support/project.ts";
+import { projectWith } from "./support/project.ts";
 import { sandboxRoot } from "./support/sandbox.ts";
-import { evaluations, NEVER_ANSWERS, useEngine } from "../tests/support/stub-engine.ts";
+import { evaluations, NEVER_ANSWERS, useEngine } from "./support/stub-engine.ts";
 
 const ALLOW_REASONS = ["command matches allowed pattern: ^git\\s+status$"];
 const ASK_REASONS = ["the command matches no allowed pattern", "it writes to a file"];

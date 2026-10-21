@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { commandFor } from "../src/command-capture.ts";
-import { startPlugin } from "../tests/support/fake-context.ts";
+import { startPlugin } from "./support/fake-context.ts";
 
 describe("command capture", () => {
   test("the command of a shell call is retrievable by call ID once the call starts", async () => {
