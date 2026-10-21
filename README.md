@@ -20,7 +20,7 @@ Only the shell tool is checked. Other tools, MCP tools, and commands you type yo
 
 ### Add the plugin
 
-Add the package name to `plugins` in your `opencode.jsonc`. Put it in your global OpenCode config to use it everywhere, or in a project's `opencode.jsonc` to use it for that project:
+After publication, add the package name to `plugins` in your `opencode.jsonc`. Put it in your global OpenCode config to use it everywhere, or in a project's `opencode.jsonc` to use it for that project:
 
 ```jsonc
 {
@@ -29,11 +29,24 @@ Add the package name to `plugins` in your `opencode.jsonc`. Put it in your globa
 }
 ```
 
-To use a local checkout instead of the published package, put the checkout's directory in `plugins`, for example `"/home/me/opencode-lovely-bash-permissions"`. OpenCode does not accept a path to a `.ts` file.
+The package is not published to npm yet. Until then, put the local checkout's directory in `plugins`, for example `"/home/me/opencode-lovely-bash-permissions"`. OpenCode does not accept a path to a `.ts` file.
+
+### Configure the terminal CLI
+
+The terminal machine also needs the package in `cli.json`, at `$XDG_CONFIG_HOME/opencode/cli.json` or `~/.config/opencode/cli.json` if `XDG_CONFIG_HOME` is unset. Since the package is not published yet, point `plugins` at the local checkout directory:
+
+```json
+{
+  "$schema": "https://opencode.ai/cli.json",
+  "plugins": ["/home/me/opencode-lovely-bash-permissions"]
+}
+```
+
+After publication, the `plugins` entry can use the package name, `"opencode-lovely-bash-permissions"`, instead.
 
 ### Remote servers
 
-If OpenCode runs on a remote server, that server must load this plugin too. A server without it runs shell commands under OpenCode's default rules, not your policy.
+Every server that runs commands must load the server half of this plugin. A server without it runs shell commands under OpenCode's default rules, not your policy. Automatic loading of a server-listed terminal plugin on a remote terminal remains unverified; configure the terminal machine's local `cli.json` entry as described above.
 
 ### Install the engine
 
@@ -62,7 +75,7 @@ If no engine is found, every shell command is denied, and the message names the 
 
 ## Policy files
 
-The plugin reads three files. None is required, but if none exists every shell command asks.
+The plugin reads three files. None is required, but if no policy file exists every shell command asks. The ask reason names the three locations, and the terminal banner displays it above the composer.
 
 | File                                   | Location                                                                                                                       | Commit it?                  |
 | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ | --------------------------- |
@@ -149,7 +162,7 @@ To change mode, change the option and restart OpenCode. Switching modes inside a
 ## Verdicts and what you see
 
 - **Allow** runs the command. You see nothing: no prompt and no message.
-- **Ask** pauses the command for your approval. The plugin's message starts with `[♡ perms: 💛 REQUIRES-USER-APPROVAL]` and lists the reasons, one bullet each. In OpenCode 2.0.30 the prompt shows only the command; see [Known limitations](#known-limitations).
+- **Ask** pauses the command for your approval. While the ask is pending, a terminal banner above the session composer shows the brand label and reasons, one bullet each.
 - **Deny** stops the command. The message starts with `[♡ perms: ❤️ auto-rejected]`, lists the reasons, one bullet each, and ends with `The tool has not been run.` In OpenCode 2.0.30 the reasons show only after you expand the denied row.
 
 Your policy overrides OpenCode's own allow and ask for shell commands, in both directions. OpenCode's explicit deny always stands.
@@ -158,24 +171,22 @@ Your policy overrides OpenCode's own allow and ask for shell commands, in both d
 
 The plugin checks the engine and the policy when OpenCode starts. A problem found there denies every shell command, and the message names the fix. Fix the problem and restart OpenCode.
 
-| Problem                                                                                                                   | Result                                                                                                     |
-| ------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| Engine not found                                                                                                          | Every shell command is denied. The message names the install command and `LOVELY_PI_BASH_PERMISSIONS_BIN`. |
-| Engine cannot start or does not answer                                                                                    | Every shell command is denied. The message names the failure and the fix.                                  |
-| Engine answers with a different protocol version, at startup or on a command                                              | Every shell command is denied from then on. The message names the mismatch and the fix.                    |
-| Policy file cannot be read, is not valid JSONC, has no `default` mode, or has a mode key or `*` level that is not allowed | Every shell command is denied. The message names the file.                                                 |
-| Engine rejects the bash block, for example an unknown key or a bad level                                                  | Every shell command is denied. The message names the engine's error.                                       |
-| Chosen mode does not exist                                                                                                | Every shell command is denied. The message names the mode and the modes that exist.                        |
-| No policy file in any of the three locations                                                                              | Every shell command asks.                                                                                  |
-| The engine errors, or does not answer within 5 seconds, on one command                                                    | That command gets the `error` level. The reason is the engine's message.                                   |
+| Problem                                                                                                                   | Result                                                                                                       |
+| ------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| Engine not found                                                                                                          | Every shell command is denied. The message names the install command and `LOVELY_PI_BASH_PERMISSIONS_BIN`.   |
+| Engine cannot start or does not answer                                                                                    | Every shell command is denied. The message names the failure and the fix.                                    |
+| Engine answers with a different protocol version, at startup or on a command                                              | Every shell command is denied from then on. The message names the mismatch and the fix.                      |
+| Policy file cannot be read, is not valid JSONC, has no `default` mode, or has a mode key or `*` level that is not allowed | Every shell command is denied. The message names the file.                                                   |
+| Engine rejects the bash block, for example an unknown key or a bad level                                                  | Every shell command is denied. The message names the engine's error.                                         |
+| Chosen mode does not exist                                                                                                | Every shell command is denied. The message names the mode and the modes that exist.                          |
+| No policy file in any of the three locations                                                                              | Every shell command asks. The reason names the three locations and appears in the banner above the composer. |
+| The engine errors, or does not answer within 5 seconds, on one command                                                    | That command gets the `error` level. The reason is the engine's message.                                     |
 
 A failure on one command affects only that command.
 
 ## Known limitations
 
-- **Ask prompts show only the command.** In OpenCode 2.0.30 the approval prompt shows the command, but not the reasons or the brand label. The plugin still sends them.
 - **Layering warnings are logged, not shown.** OpenCode 2.0.30 gives this plugin no visible channel for a warning, so warnings only reach the log.
-- **The no-policy warning is not shown.** With no policy file, every command asks. The ask names the three locations, but because of the first limitation you see only the command.
 - **Commands made only of `cd` are never checked.** For example, `cd src` is not checked by this plugin, because OpenCode does not ask about it.
 - **Approvals are not saved.** This plugin does not handle the "always" choice on an approval prompt.
 
