@@ -1,4 +1,4 @@
-import { describe, expect, test } from "vite-plus/test";
+import { describe, expect, test } from "bun:test";
 import { ASK_LABEL } from "../src/labels.ts";
 import { pickAskBannerMessage } from "../src/ask-banner.ts";
 

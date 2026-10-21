@@ -1,10 +1,10 @@
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { beforeEach, afterEach, expect, test } from "vite-plus/test";
+import { afterEach, beforeEach, expect, test } from "bun:test";
 import { selectMode } from "../src/mode.ts";
 import { restoreEnvAfterEach } from "./support/env.ts";
-import { readLayeredPolicy } from "./support/project.ts";
+import { readLayeredPolicy } from "../tests/support/project.ts";
 
 restoreEnvAfterEach(["HOME", "XDG_CONFIG_HOME", "OPENCODE_CONFIG_DIR"]);
 

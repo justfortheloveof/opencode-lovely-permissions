@@ -1,7 +1,7 @@
 import type { Plugin } from "@opencode/plugin";
 import type { PermissionEvaluation } from "@opencode/plugin/promise/permission";
 import plugin from "../../src/index.ts";
-import { emptyProjectDir } from "./sandbox.ts";
+import { emptyProjectDir } from "./sandbox-core.ts";
 
 type Hook = (event: never) => unknown;
 

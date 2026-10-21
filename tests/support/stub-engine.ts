@@ -1,6 +1,6 @@
 import { chmodSync, existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { sandboxRoot } from "./sandbox.ts";
+import { sandboxRoot } from "./sandbox-core.ts";
 
 export interface StubEngine {
   /** Executable path, for `LOVELY_PI_BASH_PERMISSIONS_BIN` or a directory on PATH. */
