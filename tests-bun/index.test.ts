@@ -1,11 +1,16 @@
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { describe, expect, test, vi } from "vite-plus/test";
+import { describe, expect, spyOn, test } from "bun:test";
 import plugin from "../src/index.ts";
-import { judge, startPlugin } from "./support/fake-context.ts";
-import { projectWith, projectWithText } from "./support/project.ts";
-import { sandboxRoot } from "./support/sandbox.ts";
-import { crashingEngine, evaluations, useEngine, type StubReply } from "./support/stub-engine.ts";
+import { judge, startPlugin } from "../tests/support/fake-context.ts";
+import { projectWith, projectWithText } from "../tests/support/project.ts";
+import { sandboxRoot } from "../tests/support/sandbox.ts";
+import {
+  crashingEngine,
+  evaluations,
+  useEngine,
+  type StubReply,
+} from "../tests/support/stub-engine.ts";
 
 const NOT_FOUND_DENIAL = [
   "[♡ perms: ❤️ auto-rejected]",
@@ -119,14 +124,14 @@ describe("when the policy is valid", () => {
     useEngine({ protocol: 1, valid: true, action: "ask", reason, reasons: [reason] });
     const harness = await startPlugin(projectWith({ default: { bash: BASH } }));
     await harness.startCall({ tool: "shell", id: "call_valid", input: { command: "rm -rf /" } });
-    await expect(
-      harness.evaluate({
+    expect(
+      await harness.evaluate({
         action: "shell",
         resources: ["rm -rf /"],
         effect: "allow",
         source: { type: "tool", messageID: "msg_test", id: "call_valid" },
       }),
-    ).resolves.toEqual({
+    ).toEqual({
       effect: "ask",
       message: "[♡ perms: 💛 REQUIRES-USER-APPROVAL]\n- the command matches no allowed pattern",
     });
@@ -141,7 +146,7 @@ describe("when the policy is valid", () => {
     process.env.OPENCODE_CONFIG_DIR = globalDir;
     useEngine({ protocol: 1, valid: true });
     const directory = projectWith({ default: { bash: { "*": "deny" } } });
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const warn = spyOn(console, "warn").mockImplementation(() => {});
     try {
       await startPlugin(directory);
       expect(warn).toHaveBeenCalledWith(
@@ -205,15 +210,15 @@ describe("when the mode option is set", () => {
       projectWith({ default: { bash: BASH }, personal: { "*": "allow" } }),
       { mode: "strict" },
     );
-    await expect(
-      harness.evaluate({ action: "shell", resources: ["git status"], effect: "allow" }),
-    ).resolves.toEqual({ effect: "deny", message: UNKNOWN_MODE_DENIAL });
-    await expect(
-      harness.evaluate({ action: "shell", resources: ["rm -rf /"], effect: "ask" }),
-    ).resolves.toEqual({ effect: "deny", message: UNKNOWN_MODE_DENIAL });
-    await expect(
-      harness.evaluate({ action: "read", resources: ["/etc/hosts"], effect: "allow" }),
-    ).resolves.toEqual({ effect: "allow", message: undefined });
+    expect(
+      await harness.evaluate({ action: "shell", resources: ["git status"], effect: "allow" }),
+    ).toEqual({ effect: "deny", message: UNKNOWN_MODE_DENIAL });
+    expect(
+      await harness.evaluate({ action: "shell", resources: ["rm -rf /"], effect: "ask" }),
+    ).toEqual({ effect: "deny", message: UNKNOWN_MODE_DENIAL });
+    expect(
+      await harness.evaluate({ action: "read", resources: ["/etc/hosts"], effect: "allow" }),
+    ).toEqual({ effect: "allow", message: undefined });
     expect(engine.requests()).toEqual([]);
   });
 });
@@ -229,15 +234,15 @@ describe("when the engine rejects the policy", () => {
       `- the bash engine rejected the policy file ${file}: ${UNKNOWN_KEY_ERROR}. Fix what it names, then restart OpenCode.`,
       "The tool has not been run.",
     ].join("\n");
-    await expect(
-      harness.evaluate({ action: "shell", resources: ["git status"], effect: "allow" }),
-    ).resolves.toEqual({ effect: "deny", message: denial });
-    await expect(
-      harness.evaluate({ action: "shell", resources: ["rm -rf /"], effect: "allow" }),
-    ).resolves.toEqual({ effect: "deny", message: denial });
-    await expect(
-      harness.evaluate({ action: "read", resources: ["/etc/hosts"], effect: "allow" }),
-    ).resolves.toEqual({ effect: "allow", message: undefined });
+    expect(
+      await harness.evaluate({ action: "shell", resources: ["git status"], effect: "allow" }),
+    ).toEqual({ effect: "deny", message: denial });
+    expect(
+      await harness.evaluate({ action: "shell", resources: ["rm -rf /"], effect: "allow" }),
+    ).toEqual({ effect: "deny", message: denial });
+    expect(
+      await harness.evaluate({ action: "read", resources: ["/etc/hosts"], effect: "allow" }),
+    ).toEqual({ effect: "allow", message: undefined });
   });
 
   test("a bad level value denies every shell call, naming the file and the key", async () => {
@@ -245,9 +250,9 @@ describe("when the engine rejects the policy", () => {
     const project = projectWith({ default: { bash: { "*": "alow" } } });
     const file = join(project, ".opencode", "lovely-permissions.jsonc");
     const harness = await startPlugin(project);
-    await expect(
-      harness.evaluate({ action: "shell", resources: ["git status"], effect: "allow" }),
-    ).resolves.toEqual({
+    expect(
+      await harness.evaluate({ action: "shell", resources: ["git status"], effect: "allow" }),
+    ).toEqual({
       effect: "deny",
       message: [
         "[♡ perms: ❤️ auto-rejected]",
@@ -267,9 +272,9 @@ describe("when the engine rejects the policy", () => {
       { byConfig: rejecting({ "*": "alow" }, BAD_LEVEL_ERROR) },
     );
     const harness = await startPlugin(projectWith({ default: { bash: { "*": "deny" } } }));
-    await expect(
-      harness.evaluate({ action: "shell", resources: ["git status"], effect: "allow" }),
-    ).resolves.toEqual({
+    expect(
+      await harness.evaluate({ action: "shell", resources: ["git status"], effect: "allow" }),
+    ).toEqual({
       effect: "deny",
       message: [
         "[♡ perms: ❤️ auto-rejected]",
@@ -291,9 +296,9 @@ describe("when the engine rejects the policy", () => {
       { byConfig: rejecting({ "*": "ask", subshell: "deny" }, "the merged block is inconsistent") },
     );
     const harness = await startPlugin(project);
-    await expect(
-      harness.evaluate({ action: "shell", resources: ["git status"], effect: "allow" }),
-    ).resolves.toEqual({
+    expect(
+      await harness.evaluate({ action: "shell", resources: ["git status"], effect: "allow" }),
+    ).toEqual({
       effect: "deny",
       message: [
         "[♡ perms: ❤️ auto-rejected]",
@@ -310,9 +315,9 @@ describe("when the policy file cannot be read or parsed", () => {
     const directory = projectWithText(`{ "default": { "*": "ask", `);
     const file = join(directory, ".opencode", "lovely-permissions.jsonc");
     const harness = await startPlugin(directory);
-    await expect(
-      harness.evaluate({ action: "shell", resources: ["git status"], effect: "allow" }),
-    ).resolves.toEqual({
+    expect(
+      await harness.evaluate({ action: "shell", resources: ["git status"], effect: "allow" }),
+    ).toEqual({
       effect: "deny",
       message: [
         "[♡ perms: ❤️ auto-rejected]",
@@ -328,9 +333,9 @@ describe("when the policy file cannot be read or parsed", () => {
     const file = join(directory, ".opencode", "lovely-permissions.jsonc");
     mkdirSync(file, { recursive: true });
     const harness = await startPlugin(directory);
-    await expect(
-      harness.evaluate({ action: "shell", resources: ["git status"], effect: "allow" }),
-    ).resolves.toEqual({
+    expect(
+      await harness.evaluate({ action: "shell", resources: ["git status"], effect: "allow" }),
+    ).toEqual({
       effect: "deny",
       message: [
         "[♡ perms: ❤️ auto-rejected]",
@@ -345,9 +350,9 @@ describe("when the policy file cannot be read or parsed", () => {
     const directory = projectWith({ build: { bash: BASH } });
     const file = join(directory, ".opencode", "lovely-permissions.jsonc");
     const harness = await startPlugin(directory);
-    await expect(
-      harness.evaluate({ action: "shell", resources: ["git status"], effect: "allow" }),
-    ).resolves.toEqual({
+    expect(
+      await harness.evaluate({ action: "shell", resources: ["git status"], effect: "allow" }),
+    ).toEqual({
       effect: "deny",
       message: [
         "[♡ perms: ❤️ auto-rejected]",
@@ -362,9 +367,9 @@ describe("when the policy file cannot be read or parsed", () => {
     const project = projectWith({ default: { bash: BASH, bahs: { "*": "deny" } } });
     const file = join(project, ".opencode", "lovely-permissions.jsonc");
     const harness = await startPlugin(project);
-    await expect(
-      harness.evaluate({ action: "shell", resources: ["git status"], effect: "allow" }),
-    ).resolves.toEqual({
+    expect(
+      await harness.evaluate({ action: "shell", resources: ["git status"], effect: "allow" }),
+    ).toEqual({
       effect: "deny",
       message: [
         "[♡ perms: ❤️ auto-rejected]",
@@ -379,9 +384,9 @@ describe("when the policy file cannot be read or parsed", () => {
     const project = projectWith({ default: { "*": "alow", bash: BASH } });
     const file = join(project, ".opencode", "lovely-permissions.jsonc");
     const harness = await startPlugin(project);
-    await expect(
-      harness.evaluate({ action: "shell", resources: ["git status"], effect: "allow" }),
-    ).resolves.toEqual({
+    expect(
+      await harness.evaluate({ action: "shell", resources: ["git status"], effect: "allow" }),
+    ).toEqual({
       effect: "deny",
       message: [
         "[♡ perms: ❤️ auto-rejected]",
@@ -396,9 +401,9 @@ describe("when the engine gives no answer", () => {
   test("a shell call is denied, naming the failure and the fix", async () => {
     useEngine("engine: unexpected output\n");
     const harness = await startPlugin(projectWith({ default: { bash: BASH } }));
-    await expect(
-      harness.evaluate({ action: "shell", resources: ["git status"], effect: "allow" }),
-    ).resolves.toEqual({
+    expect(
+      await harness.evaluate({ action: "shell", resources: ["git status"], effect: "allow" }),
+    ).toEqual({
       effect: "deny",
       message: [
         "[♡ perms: ❤️ auto-rejected]",
@@ -426,15 +431,15 @@ describe("when the engine exits on start", () => {
   test("every shell call is denied, naming the failure and the fix", async () => {
     process.env.LOVELY_PI_BASH_PERMISSIONS_BIN = crashingEngine(1).path;
     const harness = await startPlugin(projectWith({ default: { bash: BASH } }));
-    await expect(
-      harness.evaluate({ action: "shell", resources: ["git status"], effect: "allow" }),
-    ).resolves.toEqual({ effect: "deny", message: DENIAL });
-    await expect(
-      harness.evaluate({ action: "shell", resources: ["rm -rf /"], effect: "ask" }),
-    ).resolves.toEqual({ effect: "deny", message: DENIAL });
-    await expect(
-      harness.evaluate({ action: "read", resources: ["/etc/hosts"], effect: "allow" }),
-    ).resolves.toEqual({ effect: "allow", message: undefined });
+    expect(
+      await harness.evaluate({ action: "shell", resources: ["git status"], effect: "allow" }),
+    ).toEqual({ effect: "deny", message: DENIAL });
+    expect(
+      await harness.evaluate({ action: "shell", resources: ["rm -rf /"], effect: "ask" }),
+    ).toEqual({ effect: "deny", message: DENIAL });
+    expect(
+      await harness.evaluate({ action: "read", resources: ["/etc/hosts"], effect: "allow" }),
+    ).toEqual({ effect: "allow", message: undefined });
   });
 
   test("a shell call whose command was captured is denied too, for the rest of the session", async () => {
@@ -445,22 +450,22 @@ describe("when the engine exits on start", () => {
       id: "call_failed",
       input: { command: "git status" },
     });
-    await expect(
-      harness.evaluate({
+    expect(
+      await harness.evaluate({
         action: "shell",
         resources: ["git status"],
         effect: "allow",
         source: { type: "tool", messageID: "msg_test", id: "call_failed" },
       }),
-    ).resolves.toEqual({ effect: "deny", message: DENIAL });
+    ).toEqual({ effect: "deny", message: DENIAL });
   });
 
   test("with no policy file, every shell call is still denied", async () => {
     process.env.LOVELY_PI_BASH_PERMISSIONS_BIN = crashingEngine(1).path;
     const harness = await startPlugin();
-    await expect(
-      harness.evaluate({ action: "shell", resources: ["git status"], effect: "allow" }),
-    ).resolves.toEqual({ effect: "deny", message: DENIAL });
+    expect(
+      await harness.evaluate({ action: "shell", resources: ["git status"], effect: "allow" }),
+    ).toEqual({ effect: "deny", message: DENIAL });
   });
 });
 
@@ -469,16 +474,24 @@ describe("when the engine cannot be started", () => {
     const path = unrunnableEngine();
     process.env.LOVELY_PI_BASH_PERMISSIONS_BIN = path;
     const harness = await startPlugin(projectWith({ default: { bash: BASH } }));
-    await expect(
-      harness.evaluate({ action: "shell", resources: ["git status"], effect: "allow" }),
-    ).resolves.toEqual({
-      effect: "deny",
-      message: [
-        "[♡ perms: ❤️ auto-rejected]",
-        `- the bash engine did not start or answer: it could not be started: spawn ${path} EACCES. Reinstall it with \`uv tool install lovely-bash-permissions\`, or set LOVELY_PI_BASH_PERMISSIONS_BIN to a working engine binary, then restart OpenCode.`,
-        "The tool has not been run.",
-      ].join("\n"),
+    const decision = await harness.evaluate({
+      action: "shell",
+      resources: ["git status"],
+      effect: "allow",
     });
+
+    // Bun and Node format spawn errors differently; the verdict and diagnostic context stay stable.
+    expect(decision.effect).toBe("deny");
+    expect(decision.message).toContain("[♡ perms: ❤️ auto-rejected]");
+    expect(decision.message).toContain(
+      "the bash engine did not start or answer: it could not be started:",
+    );
+    expect(decision.message).toContain(path);
+    expect(decision.message).toContain("EACCES");
+    expect(decision.message).toContain(
+      "Reinstall it with `uv tool install lovely-bash-permissions`",
+    );
+    expect(decision.message?.endsWith("The tool has not been run.")).toBe(true);
   });
 });
 
@@ -494,23 +507,23 @@ describe("when the engine speaks another protocol version", () => {
       `- the bash engine answered with protocol 2, but this plugin needs protocol 1. ${FIX}`,
       "The tool has not been run.",
     ].join("\n");
-    await expect(
-      harness.evaluate({ action: "shell", resources: ["git status"], effect: "allow" }),
-    ).resolves.toEqual({ effect: "deny", message: denial });
-    await expect(
-      harness.evaluate({ action: "shell", resources: ["rm -rf /"], effect: "ask" }),
-    ).resolves.toEqual({ effect: "deny", message: denial });
-    await expect(
-      harness.evaluate({ action: "read", resources: ["/etc/hosts"], effect: "allow" }),
-    ).resolves.toEqual({ effect: "allow", message: undefined });
+    expect(
+      await harness.evaluate({ action: "shell", resources: ["git status"], effect: "allow" }),
+    ).toEqual({ effect: "deny", message: denial });
+    expect(
+      await harness.evaluate({ action: "shell", resources: ["rm -rf /"], effect: "ask" }),
+    ).toEqual({ effect: "deny", message: denial });
+    expect(
+      await harness.evaluate({ action: "read", resources: ["/etc/hosts"], effect: "allow" }),
+    ).toEqual({ effect: "allow", message: undefined });
   });
 
   test("an answer with no protocol version is a mismatch too", async () => {
     useEngine({ valid: true });
     const harness = await startPlugin(projectWith({ default: { bash: BASH } }));
-    await expect(
-      harness.evaluate({ action: "shell", resources: ["git status"], effect: "allow" }),
-    ).resolves.toEqual({
+    expect(
+      await harness.evaluate({ action: "shell", resources: ["git status"], effect: "allow" }),
+    ).toEqual({
       effect: "deny",
       message: [
         "[♡ perms: ❤️ auto-rejected]",
@@ -536,9 +549,9 @@ describe("when the engine speaks another protocol version", () => {
       effect: "deny",
       message: denial,
     });
-    await expect(
-      harness.evaluate({ action: "read", resources: ["/etc/hosts"], effect: "allow" }),
-    ).resolves.toEqual({ effect: "allow", message: undefined });
+    expect(
+      await harness.evaluate({ action: "read", resources: ["/etc/hosts"], effect: "allow" }),
+    ).toEqual({ effect: "allow", message: undefined });
     expect(evaluations(engine).map((request) => request.command)).toEqual(["rm -rf /"]);
   });
 
@@ -547,15 +560,13 @@ describe("when the engine speaks another protocol version", () => {
     const harness = await startPlugin(
       projectWith({ default: { "*": "allow", bash: { "*": "allow", error: "allow" } } }),
     );
-    await expect(judge(harness, "call_mismatch_error_level", "rm -rf /", "allow")).resolves.toEqual(
-      {
-        effect: "deny",
-        message: [
-          "[♡ perms: ❤️ auto-rejected]",
-          `- the bash engine answered with protocol 2, but this plugin needs protocol 1. ${FIX}`,
-          "The tool has not been run.",
-        ].join("\n"),
-      },
-    );
+    expect(await judge(harness, "call_mismatch_error_level", "rm -rf /", "allow")).toEqual({
+      effect: "deny",
+      message: [
+        "[♡ perms: ❤️ auto-rejected]",
+        `- the bash engine answered with protocol 2, but this plugin needs protocol 1. ${FIX}`,
+        "The tool has not been run.",
+      ].join("\n"),
+    });
   });
 });

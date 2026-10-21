@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { describe, expect, test } from "vite-plus/test";
+import { describe, expect, test } from "bun:test";
 import { Host } from "@opencode/plugin/host";
 import tuiPlugin from "opencode-lovely-bash-permissions/tui";
 import rootEntry from "../index.ts";

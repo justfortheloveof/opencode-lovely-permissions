@@ -1,11 +1,11 @@
 import { mkdirSync, mkdtempSync } from "node:fs";
 import { join } from "node:path";
-import { beforeEach, describe, expect, test } from "vite-plus/test";
-import { judge, startPlugin } from "./support/fake-context.ts";
-import { restoreEnvAfterEach } from "./support/env.ts";
-import { projectWith } from "./support/project.ts";
-import { sandboxRoot } from "./support/sandbox.ts";
-import { evaluations, NEVER_ANSWERS, useEngine } from "./support/stub-engine.ts";
+import { beforeEach, describe, expect, test } from "bun:test";
+import { judge, startPlugin, type PermissionDecision } from "../tests/support/fake-context.ts";
+import { restoreEnvAfterEach } from "../tests/support/env.ts";
+import { projectWith } from "../tests/support/project.ts";
+import { sandboxRoot } from "../tests/support/sandbox.ts";
+import { evaluations, NEVER_ANSWERS, useEngine } from "../tests/support/stub-engine.ts";
 
 const ALLOW_REASONS = ["command matches allowed pattern: ^git\\s+status$"];
 const ASK_REASONS = ["the command matches no allowed pattern", "it writes to a file"];
@@ -184,11 +184,11 @@ describe("with no policy file", () => {
   test("every shell call asks, naming the three expected locations, whatever OpenCode's effect", async () => {
     useEngine(verdict("allow", ALLOW_REASONS));
     const harness = await startPlugin(project);
-    await expect(judge(harness, "call_no_policy_allow", "git status", "allow")).resolves.toEqual({
+    expect(await judge(harness, "call_no_policy_allow", "git status", "allow")).toEqual({
       effect: "ask",
       message: expected,
     });
-    await expect(judge(harness, "call_no_policy_ask", "rm -rf /", "ask")).resolves.toEqual({
+    expect(await judge(harness, "call_no_policy_ask", "rm -rf /", "ask")).toEqual({
       effect: "ask",
       message: expected,
     });
@@ -213,14 +213,14 @@ describe("with no policy file", () => {
   test("a shell call with no captured command still asks", async () => {
     useEngine(verdict("allow", ALLOW_REASONS));
     const harness = await startPlugin(project);
-    await expect(
-      harness.evaluate({
+    expect(
+      await harness.evaluate({
         action: "shell",
         resources: ["git status"],
         effect: "allow",
         source: { type: "tool", messageID: "msg_test", id: "call_never_started" },
       }),
-    ).resolves.toEqual({ effect: "ask", message: expected });
+    ).toEqual({ effect: "ask", message: expected });
   });
 });
 
@@ -253,7 +253,7 @@ describe("an engine error for one command", () => {
   const DENIED =
     "[♡ perms: ❤️ auto-rejected]\n- internal error: KeyError: 'op'\nThe tool has not been run.";
 
-  test.each([
+  const cases: [string, Record<string, unknown>, PermissionDecision][] = [
     [
       "takes the bash block's own error level ahead of its * and the mode's *",
       { "*": "allow", bash: { "*": "allow", error: "deny" } },
@@ -275,7 +275,9 @@ describe("an engine error for one command", () => {
       { "*": "deny", bash: { error: "allow", "*": "deny" } },
       { effect: "allow", message: undefined },
     ],
-  ])("%s", async (_, mode, expected) => {
+  ];
+
+  test.each(cases)("%s", async (_, mode, expected) => {
     const engine = useEngine(verdict("allow", ALLOW_REASONS), {
       byCommand: { "rm -rf /": ENGINE_FAILURE },
     });
