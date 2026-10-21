@@ -3,6 +3,10 @@ import { jsx } from "opentui:runtime-module:%40opentui%2Fsolid%2Fjsx-runtime";
 import { onMount } from "opentui:runtime-module:solid-js";
 import { pickAskBannerMessage } from "./ask-banner.ts";
 
+function pendingPermissions(context: Plugin.Context, sessionID: string) {
+  return context.data.session.permission.list(sessionID) ?? [];
+}
+
 function AskBannerSlot(context: Plugin.Context, sessionID: string) {
   try {
     const familySessionIDs = context.data.session.family(sessionID);
@@ -12,7 +16,7 @@ function AskBannerSlot(context: Plugin.Context, sessionID: string) {
         [...sessionIDs].map((familySessionID) =>
           context.data.session.permission.sync(familySessionID),
         ),
-      );
+      ).catch(() => {});
     });
 
     if (context.data.session.get(sessionID)?.parentID) return null;
@@ -21,12 +25,10 @@ function AskBannerSlot(context: Plugin.Context, sessionID: string) {
       get children() {
         try {
           const asks = [
-            ...(context.data.session.permission.list(sessionID) ?? []),
+            ...pendingPermissions(context, sessionID),
             ...familySessionIDs
               .filter((familySessionID) => familySessionID !== sessionID)
-              .flatMap(
-                (familySessionID) => context.data.session.permission.list(familySessionID) ?? [],
-              ),
+              .flatMap((familySessionID) => pendingPermissions(context, familySessionID)),
           ];
           return pickAskBannerMessage(asks.map(({ message }) => ({ message: message ?? "" })));
         } catch {

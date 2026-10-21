@@ -44,6 +44,25 @@ describe("terminal plugin", () => {
     expect(harness.permissionSyncs).toEqual(["ses_viewed", "ses_child"]);
   });
 
+  test("keeps the banner visible and suppresses unhandled sync failures", async () => {
+    const message = "[♡ perms: 💛 REQUIRES-USER-APPROVAL]\n- sync failure ask";
+    const harness = await startTerminalPlugin(
+      { ses_viewed: [{ message }] },
+      { syncFailure: new Error("permission sync unavailable") },
+    );
+    const unhandledErrors: unknown[] = [];
+    const onUnhandledRejection = (reason: unknown) => unhandledErrors.push(reason);
+    process.on("unhandledRejection", onUnhandledRejection);
+
+    try {
+      expect(renderedChildren(harness.render({ sessionID: "ses_viewed" }))).toBe(message);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(unhandledErrors).toEqual([]);
+    } finally {
+      process.off("unhandledRejection", onUnhandledRejection);
+    }
+  });
+
   test("renders a branded ask using the rule's message verbatim", async () => {
     const message =
       "[♡ perms: 💛 REQUIRES-USER-APPROVAL]\n- the command matches no allowed pattern";

@@ -18,6 +18,11 @@ interface RecordedSlot {
   readonly render: (input: SlotInput) => unknown;
 }
 
+interface SlotClaim {
+  readonly append: "session.composer.top";
+  readonly render: (input: SlotInput) => unknown;
+}
+
 export interface TerminalPluginHarness {
   /** Slot paths the plugin registered. */
   readonly registered: string[];
@@ -33,6 +38,7 @@ interface SessionState {
   readonly sessionsByID?: Readonly<Record<string, SessionInfo>>;
   readonly familyBySession?: Readonly<Record<string, readonly string[]>>;
   readonly permissionsAfterSync?: Readonly<Record<string, readonly PendingPermission[]>>;
+  readonly syncFailure?: Error;
 }
 
 /** Runs the terminal plugin against fake pending permissions and records its slots. */
@@ -68,23 +74,18 @@ export async function startTerminalPlugin(
             permissionSyncs.push(sessionID);
             const permissions = sessionState.permissionsAfterSync?.[sessionID];
             if (permissions !== undefined) currentPermissions[sessionID] = permissions;
+            if (sessionState.syncFailure !== undefined) {
+              return Promise.reject(sessionState.syncFailure);
+            }
             return Promise.resolve();
           },
         },
       },
     },
     ui: {
-      slot(claim: {
-        readonly [placement: string]: unknown;
-        readonly render: (input: SlotInput) => unknown;
-      }) {
-        for (const placement of ["append", "prepend", "before", "after", "replace"]) {
-          const path = claim[placement];
-          if (typeof path === "string") {
-            registered.push(path);
-            slots.push({ path, render: claim.render });
-          }
-        }
+      slot(claim: SlotClaim) {
+        registered.push(claim.append);
+        slots.push({ path: claim.append, render: claim.render });
         return () => {};
       },
     },
