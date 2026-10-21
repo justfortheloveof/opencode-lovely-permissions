@@ -19,8 +19,7 @@
   },
   "scripts": {
     "check": "vp check",
-    "test": "vp test && bun run test:bun",
-    "test:bun": "bun test --parallel ./tests-bun",
+    "test": "bun test --parallel",
     "prepare": "vp config --no-agent"
   },
   "dependencies": {
@@ -32,7 +31,6 @@
     "@opentui/solid": "0.6.6",
     "@types/bun": "1.4.3",
     "@types/node": "^26.6.5",
-    "@vitest/coverage-v8": "5.0.5",
     "solid-js": "1.9.15",
     "typescript": "^7.0.2",
     "vite-plus": "1.3.0"
