@@ -1,5 +1,7 @@
 Status: ready-for-agent
 
+> **Subsequent tooling decision (2026-10-20):** This spec's original packaging and tooling choices—TypeScript-source entries with no build, pnpm, and `vp test`—are historical and are superseded by [ADR-0005](../../docs/adr/0005-compile-solid-jsx-for-tui-entry.md) and [ADR-0006](../../docs/adr/0006-use-bun-for-package-management-and-tests.md). The original feature requirements and completed acceptance criteria remain historical reference.
+
 # Initial implementation: OpenCode bash permissions plugin
 
 ## Problem Statement

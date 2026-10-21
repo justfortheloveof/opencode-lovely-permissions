@@ -1,5 +1,7 @@
 Status: ready-for-agent
 
+> **Subsequent packaging and tooling decision (2026-10-20):** The terminal-entry and test-runner instructions in this spec—including shipping `src/tui.ts`, prohibiting JSX, and relying on the Vite+ test aliases—are historical and superseded by [ADR-0005](../../docs/adr/0005-compile-solid-jsx-for-tui-entry.md) and [ADR-0006](../../docs/adr/0006-use-bun-for-package-management-and-tests.md). The ask-banner behavior, server contract, and completed validation records remain historical; the remote-loading waiver is unchanged.
+
 # Add a CLI banner for ask reasons during the permission prompt
 
 ## Problem Statement
