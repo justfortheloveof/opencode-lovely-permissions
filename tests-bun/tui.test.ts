@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { testRender } from "@opentui/solid";
 import { startTerminalPlugin } from "../tests/support/fake-terminal-context.ts";
+import { withTestRender } from "./support/test-render.ts";
 
 function visibleText(frame: string): string {
   return frame
@@ -14,34 +14,22 @@ async function visibleFrame(
   harness: Awaited<ReturnType<typeof startTerminalPlugin>>,
   sessionID: string,
 ): Promise<string> {
-  const setup = await testRender(() => harness.render({ sessionID }), {
-    width: 80,
-    height: 6,
-  });
-
-  try {
-    await setup.renderOnce();
-    return visibleText(setup.captureCharFrame());
-  } finally {
-    await setup.dispose();
-  }
+  return withTestRender(
+    () => harness.render({ sessionID }),
+    (setup) => visibleText(setup.captureCharFrame()),
+  );
 }
 
 describe("terminal plugin", () => {
   test("registers the session composer-top slot and reads permissions for its session", async () => {
     const harness = await startTerminalPlugin({});
 
-    const setup = await testRender(() => harness.render({ sessionID: "ses_viewed" }), {
-      width: 80,
-      height: 6,
-    });
-
-    try {
-      await setup.renderOnce();
-      expect(setup.captureCharFrame()).not.toContain("REQUIRES-USER-APPROVAL");
-    } finally {
-      await setup.dispose();
-    }
+    await withTestRender(
+      () => harness.render({ sessionID: "ses_viewed" }),
+      (setup) => {
+        expect(setup.captureCharFrame()).not.toContain("REQUIRES-USER-APPROVAL");
+      },
+    );
 
     expect(harness.registered).toContain("session.composer.top");
     expect(harness.permissionLookups).toEqual(["ses_viewed"]);
@@ -112,29 +100,24 @@ describe("terminal plugin", () => {
     const harness = await startTerminalPlugin({
       ses_viewed: [{ message: firstMessage }, { message: nextMessage }],
     });
-    const setup = await testRender(() => harness.render({ sessionID: "ses_viewed" }), {
-      width: 80,
-      height: 6,
-    });
+    await withTestRender(
+      () => harness.render({ sessionID: "ses_viewed" }),
+      async (setup) => {
+        expect(visibleText(setup.captureCharFrame())).toContain(firstMessage);
 
-    try {
-      await setup.renderOnce();
-      expect(visibleText(setup.captureCharFrame())).toContain(firstMessage);
+        harness.setPermissions("ses_viewed", [{ message: nextMessage }]);
+        const nextFrame = await setup.waitForFrame((frame) =>
+          visibleText(frame).includes(nextMessage),
+        );
+        expect(visibleText(nextFrame)).not.toContain(firstMessage);
 
-      harness.setPermissions("ses_viewed", [{ message: nextMessage }]);
-      const nextFrame = await setup.waitForFrame((frame) =>
-        visibleText(frame).includes(nextMessage),
-      );
-      expect(visibleText(nextFrame)).not.toContain(firstMessage);
-
-      harness.setPermissions("ses_viewed", []);
-      const emptyFrame = await setup.waitForFrame(
-        (frame) => !visibleText(frame).includes(nextMessage),
-      );
-      expect(visibleText(emptyFrame)).not.toContain(nextMessage);
-    } finally {
-      await setup.dispose();
-    }
+        harness.setPermissions("ses_viewed", []);
+        const emptyFrame = await setup.waitForFrame(
+          (frame) => !visibleText(frame).includes(nextMessage),
+        );
+        expect(visibleText(emptyFrame)).not.toContain(nextMessage);
+      },
+    );
   });
 
   test("renders nothing when reading pending permissions throws", async () => {
