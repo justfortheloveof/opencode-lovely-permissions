@@ -4,7 +4,7 @@ import { describe, expect, spyOn, test } from "bun:test";
 import plugin from "../src/index.ts";
 import { judge, startPlugin } from "../tests/support/fake-context.ts";
 import { projectWith, projectWithText } from "../tests/support/project.ts";
-import { sandboxRoot } from "../tests/support/sandbox.ts";
+import { sandboxRoot } from "./support/sandbox.ts";
 import {
   crashingEngine,
   evaluations,

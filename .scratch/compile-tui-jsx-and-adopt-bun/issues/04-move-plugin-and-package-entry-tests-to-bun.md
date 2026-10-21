@@ -15,9 +15,10 @@
 
 ## Answer
 
-Moved the server plugin, permission-verdict, terminal plugin, TUI rule-failure, and package-entry suites to the Bun lane. The Bun preload maps only shared fixture lifecycle hooks to Bun and the rule-failure test installs its module mock before dynamically importing the plugin harness.
+Moved the server plugin, permission-verdict, terminal plugin, TUI rule-failure, and package-entry suites to the Bun lane. The Bun preload uses Bun-specific lifecycle and sandbox support, and the rule-failure test installs its module mock before dynamically importing the plugin harness.
 
 ## Comments
 
-- `vp run test`: 7 Vitest files / 76 tests and 5 Bun files / 76 tests passed.
+- After merging integration tip `a88368d`, `bun test --parallel ./tests-bun`: 12 files / 152 tests passed.
 - `vp check`: formatting, lint, and type checks passed.
+- `vp run test` currently stops at `vp test` with “No test files found” because tickets 03 and 04 have moved all suites to Bun; ticket 05 retires the empty Vitest lane.
