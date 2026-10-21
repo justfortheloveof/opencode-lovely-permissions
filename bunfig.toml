@@ -1,2 +1,2 @@
 [test]
-preload = ["./tests-bun/support/setup.ts"]
+preload = ["@opentui/solid/preload", "./tests-bun/support/setup.ts"]

@@ -190,6 +190,30 @@ A failure on one command affects only that command.
 - **Commands made only of `cd` are never checked.** For example, `cd src` is not checked by this plugin, because OpenCode does not ask about it.
 - **Approvals are not saved.** This plugin does not handle the "always" choice on an approval prompt.
 
+## Development
+
+Use Bun 1.4.3 for package management, building, and tests. Vite+ remains the task
+runner and check command:
+
+```bash
+bun install
+vp check
+vp run test
+```
+
+The test script builds the terminal entry before running the Bun suite. To load a
+fresh local checkout in OpenCode's terminal, build it first:
+
+```bash
+bun run build
+```
+
+The package's `./tui` export and the local `tui.ts` shim select `dist/tui.js`.
+Packing runs the same build automatically; the generated `dist` output is not
+committed. The server entry remains source-based and does not require the
+optional terminal-rendering peers for server-only use. A published package
+consumer does not need Bun to load the compiled terminal entry.
+
 ## Out of scope
 
 - Handling the "always" choice on an approval prompt.
@@ -201,7 +225,8 @@ A failure on one command affects only that command.
 - Commands made only of `cd`, which OpenCode does not ask about.
 - A contract test against the real engine. The plugin's tests use a stub engine.
 - Publishing to npm. The package is ready to publish, but the release itself is a separate step.
-- A build step. The entry point ships as TypeScript source.
+- Verifying OpenCode's runtime load of the generated terminal entry. Static
+  package checks do not prove runtime loading.
 
 ## License
 

@@ -6,20 +6,23 @@
   "files": [
     "index.ts",
     "tui.ts",
-    "src"
+    "src",
+    "dist"
   ],
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./tui": "./src/tui.ts",
+    "./tui": "./dist/tui.js",
     "./package.json": "./package.json"
   },
   "publishConfig": {
     "access": "public"
   },
   "scripts": {
+    "build": "bun scripts/build-tui.ts",
     "check": "vp check",
-    "test": "bun test --parallel",
+    "test": "bun run build && bun test --parallel",
+    "prepack": "bun run build",
     "prepare": "vp config --no-agent"
   },
   "dependencies": {

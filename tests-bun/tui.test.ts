@@ -1,11 +1,47 @@
 import { describe, expect, test } from "bun:test";
+import { testRender } from "@opentui/solid";
 import { startTerminalPlugin } from "../tests/support/fake-terminal-context.ts";
+
+function visibleText(frame: string): string {
+  return frame
+    .split("\n")
+    .map((line) => line.trimEnd())
+    .join("\n")
+    .trimEnd();
+}
+
+async function visibleFrame(
+  harness: Awaited<ReturnType<typeof startTerminalPlugin>>,
+  sessionID: string,
+): Promise<string> {
+  const setup = await testRender(() => harness.render({ sessionID }), {
+    width: 80,
+    height: 6,
+  });
+
+  try {
+    await setup.renderOnce();
+    return visibleText(setup.captureCharFrame());
+  } finally {
+    await setup.dispose();
+  }
+}
 
 describe("terminal plugin", () => {
   test("registers the session composer-top slot and reads permissions for its session", async () => {
     const harness = await startTerminalPlugin({});
 
-    harness.render({ sessionID: "ses_viewed" });
+    const setup = await testRender(() => harness.render({ sessionID: "ses_viewed" }), {
+      width: 80,
+      height: 6,
+    });
+
+    try {
+      await setup.renderOnce();
+      expect(setup.captureCharFrame()).not.toContain("REQUIRES-USER-APPROVAL");
+    } finally {
+      await setup.dispose();
+    }
 
     expect(harness.registered).toContain("session.composer.top");
     expect(harness.permissionLookups).toEqual(["ses_viewed"]);
@@ -23,7 +59,7 @@ describe("terminal plugin", () => {
     );
 
     expect(harness.permissionSyncs).toEqual([]);
-    expect(harness.render({ sessionID: "ses_viewed" })).toBe(message);
+    expect(await visibleFrame(harness, "ses_viewed")).toContain(message);
     expect(harness.permissionSyncs).toEqual(["ses_viewed", "ses_child"]);
   });
 
@@ -38,7 +74,7 @@ describe("terminal plugin", () => {
     process.on("unhandledRejection", onUnhandledRejection);
 
     try {
-      expect(harness.render({ sessionID: "ses_viewed" })).toBe(message);
+      expect(await visibleFrame(harness, "ses_viewed")).toContain(message);
       await new Promise((resolve) => setTimeout(resolve, 0));
       expect(unhandledErrors).toEqual([]);
     } finally {
@@ -53,23 +89,52 @@ describe("terminal plugin", () => {
       ses_viewed: [{ message }],
     });
 
-    expect(harness.render({ sessionID: "ses_viewed" })).toBe(message);
+    expect(await visibleFrame(harness, "ses_viewed")).toContain(message);
+  });
+
+  test("does not show unbranded or reasonless pending asks", async () => {
+    for (const message of [
+      "[another tool]\n- another tool's reason",
+      "[♡ perms: 💛 REQUIRES-USER-APPROVAL]",
+    ]) {
+      const harness = await startTerminalPlugin({ ses_viewed: [{ message }] });
+
+      const frame = await visibleFrame(harness, "ses_viewed");
+
+      expect(frame).not.toContain("REQUIRES-USER-APPROVAL");
+      expect(frame).not.toContain("another tool's reason");
+    }
   });
 
   test("updates the banner as its pending ask is answered", async () => {
     const firstMessage = "[♡ perms: 💛 REQUIRES-USER-APPROVAL]\n- first reason";
     const nextMessage = "[♡ perms: 💛 REQUIRES-USER-APPROVAL]\n- next reason";
-    const pendingPermissions = {
+    const harness = await startTerminalPlugin({
       ses_viewed: [{ message: firstMessage }, { message: nextMessage }],
-    };
-    const harness = await startTerminalPlugin(pendingPermissions);
-    expect(harness.render({ sessionID: "ses_viewed" })).toBe(firstMessage);
+    });
+    const setup = await testRender(() => harness.render({ sessionID: "ses_viewed" }), {
+      width: 80,
+      height: 6,
+    });
 
-    pendingPermissions.ses_viewed.shift();
-    expect(harness.render({ sessionID: "ses_viewed" })).toBe(nextMessage);
+    try {
+      await setup.renderOnce();
+      expect(visibleText(setup.captureCharFrame())).toContain(firstMessage);
 
-    pendingPermissions.ses_viewed.shift();
-    expect(harness.render({ sessionID: "ses_viewed" })).toBeUndefined();
+      harness.setPermissions("ses_viewed", [{ message: nextMessage }]);
+      const nextFrame = await setup.waitForFrame((frame) =>
+        visibleText(frame).includes(nextMessage),
+      );
+      expect(visibleText(nextFrame)).not.toContain(firstMessage);
+
+      harness.setPermissions("ses_viewed", []);
+      const emptyFrame = await setup.waitForFrame(
+        (frame) => !visibleText(frame).includes(nextMessage),
+      );
+      expect(visibleText(emptyFrame)).not.toContain(nextMessage);
+    } finally {
+      await setup.dispose();
+    }
   });
 
   test("renders nothing when reading pending permissions throws", async () => {
@@ -79,7 +144,7 @@ describe("terminal plugin", () => {
       },
     });
     const harness = await startTerminalPlugin(permissionsBySession);
-    expect(harness.render({ sessionID: "ses_broken" })).toBeUndefined();
+    expect(await visibleFrame(harness, "ses_broken")).not.toContain("REQUIRES-USER-APPROVAL");
   });
 
   test("renders a subagent ask in the root session's banner", async () => {
@@ -100,7 +165,7 @@ describe("terminal plugin", () => {
       },
     );
 
-    expect(harness.render({ sessionID: "ses_root" })).toBe(message);
+    expect(await visibleFrame(harness, "ses_root")).toContain(message);
     expect(harness.permissionLookups).toEqual(["ses_root", "ses_child"]);
   });
 
@@ -123,7 +188,9 @@ describe("terminal plugin", () => {
       },
     );
 
-    expect(harness.render({ sessionID: "ses_root" })).toBe(ownMessage);
+    const frame = await visibleFrame(harness, "ses_root");
+    expect(frame).toContain(ownMessage);
+    expect(frame).not.toContain(childMessage);
     expect(harness.permissionLookups).toEqual(["ses_root", "ses_child"]);
   });
 
@@ -148,7 +215,9 @@ describe("terminal plugin", () => {
       },
     );
 
-    expect(harness.render({ sessionID: "ses_root" })).toBe(firstMessage);
+    const frame = await visibleFrame(harness, "ses_root");
+    expect(frame).toContain(firstMessage);
+    expect(frame).not.toContain(secondMessage);
     expect(harness.permissionLookups).toEqual(["ses_root", "ses_first", "ses_second"]);
   });
 
@@ -165,7 +234,7 @@ describe("terminal plugin", () => {
       },
     );
 
-    expect(harness.render({ sessionID: "ses_child" })).toBeNull();
+    expect(await visibleFrame(harness, "ses_child")).not.toContain(message);
     expect(harness.permissionLookups).toEqual([]);
     expect(harness.permissionSyncs).toEqual([]);
   });

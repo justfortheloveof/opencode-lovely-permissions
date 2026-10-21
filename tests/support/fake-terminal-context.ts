@@ -1,5 +1,7 @@
 import type { Plugin } from "@opencode/plugin/tui";
-import tuiPlugin from "../../src/tui.ts";
+import { createSignal } from "solid-js";
+import type { JSX } from "@opentui/solid";
+import tuiPlugin from "../../src/tui.tsx";
 
 interface PendingPermission {
   readonly message?: string;
@@ -15,12 +17,12 @@ interface SlotInput {
 
 interface RecordedSlot {
   readonly path: string;
-  readonly render: (input: SlotInput) => unknown;
+  readonly render: (input: SlotInput) => JSX.Element;
 }
 
 interface SlotClaim {
   readonly append: "session.composer.top";
-  readonly render: (input: SlotInput) => unknown;
+  readonly render: (input: SlotInput) => JSX.Element;
 }
 
 export interface TerminalPluginHarness {
@@ -31,7 +33,9 @@ export interface TerminalPluginHarness {
   /** Session IDs whose pending permissions were synced when the slot mounted. */
   readonly permissionSyncs: string[];
   /** Runs the registered composer-top slot with the host-provided input. */
-  render(input: SlotInput): unknown;
+  render(input: SlotInput): JSX.Element;
+  /** Replaces a session's pending permissions and updates an active render. */
+  setPermissions(sessionID: string, permissions: readonly PendingPermission[]): void;
   /** Runs the terminal plugin's cleanup hook. */
   dispose(): Promise<void>;
 }
@@ -52,11 +56,25 @@ export async function startTerminalPlugin(
   const permissionLookups: string[] = [];
   const permissionSyncs: string[] = [];
   const slots: RecordedSlot[] = [];
-  const currentPermissions: Record<string, readonly PendingPermission[]> = {
-    ...permissionsBySession,
-  };
+  const permissions = new Map<
+    string,
+    {
+      readonly get: () => readonly PendingPermission[];
+      readonly set: (value: readonly PendingPermission[]) => void;
+    }
+  >();
   const sessionsByID = sessionState.sessionsByID ?? {};
   const familyBySession = sessionState.familyBySession ?? {};
+
+  function permissionSignal(sessionID: string) {
+    let signal = permissions.get(sessionID);
+    if (signal === undefined) {
+      const [get, set] = createSignal(permissionsBySession[sessionID] ?? []);
+      signal = { get, set };
+      permissions.set(sessionID, signal);
+    }
+    return signal;
+  }
 
   const context = {
     data: {
@@ -70,12 +88,12 @@ export async function startTerminalPlugin(
         permission: {
           list(sessionID: string) {
             permissionLookups.push(sessionID);
-            return currentPermissions[sessionID];
+            return permissionSignal(sessionID).get();
           },
           sync(sessionID: string) {
             permissionSyncs.push(sessionID);
             const permissions = sessionState.permissionsAfterSync?.[sessionID];
-            if (permissions !== undefined) currentPermissions[sessionID] = permissions;
+            if (permissions !== undefined) permissionSignal(sessionID).set(permissions);
             if (sessionState.syncFailure !== undefined) {
               return Promise.reject(sessionState.syncFailure);
             }
@@ -108,6 +126,9 @@ export async function startTerminalPlugin(
       const slot = slots.find(({ path }) => path === "session.composer.top");
       if (slot === undefined) throw new Error("the plugin did not register session.composer.top");
       return slot.render(input);
+    },
+    setPermissions(sessionID, nextPermissions) {
+      permissionSignal(sessionID).set(nextPermissions);
     },
     async dispose() {
       if (typeof cleanup === "function") await cleanup();

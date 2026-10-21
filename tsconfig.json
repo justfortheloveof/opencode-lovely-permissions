@@ -5,6 +5,8 @@
     "moduleDetection": "force",
     "module": "nodenext",
     "moduleResolution": "nodenext",
+    "jsx": "preserve",
+    "jsxImportSource": "@opentui/solid",
     "resolveJsonModule": true,
     "types": ["node"],
     "strict": true,

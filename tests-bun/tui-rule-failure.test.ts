@@ -1,4 +1,5 @@
 import { describe, expect, mock, test } from "bun:test";
+import { testRender } from "@opentui/solid";
 import { ASK_LABEL } from "../src/labels.ts";
 
 // Register the module mock before loading the plugin graph; Bun does not rely on Vitest mock hoisting.
@@ -14,8 +15,16 @@ describe("terminal plugin failures", () => {
     const harness = await startTerminalPlugin({
       ses_viewed: [{ message: `${ASK_LABEL}\n- a reason` }],
     });
-    const rendered = harness.render({ sessionID: "ses_viewed" });
+    const setup = await testRender(() => harness.render({ sessionID: "ses_viewed" }), {
+      width: 80,
+      height: 6,
+    });
 
-    expect(rendered).toBeUndefined();
+    try {
+      await setup.renderOnce();
+      expect(setup.captureCharFrame()).not.toContain("REQUIRES-USER-APPROVAL");
+    } finally {
+      await setup.dispose();
+    }
   });
 });
