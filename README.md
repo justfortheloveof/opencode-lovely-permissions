@@ -192,11 +192,11 @@ A failure on one command affects only that command.
 
 ## Development
 
-Use Bun 1.4.3 for package management, building, and tests. Vite+ remains the task
-runner and check command:
+Use Bun 1.4.3 as the package manager and build/test runtime. Vite+ delegates
+dependency installation to Bun and provides the check and task commands:
 
 ```bash
-bun install
+vp install
 vp check
 vp run test
 ```
