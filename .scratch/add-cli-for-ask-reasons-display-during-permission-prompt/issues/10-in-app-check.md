@@ -1,4 +1,4 @@
-Status: ready-for-human
+Status: needs-info
 
 # 10: In-app check
 
@@ -20,3 +20,4 @@ Status: ready-for-human
 ## Comments
 
 - 2026-10-20: User's local in-app results: (1) root ask: no banner; (2) no banner for the next ask; (3) yes, subagent/parent behavior passed (interpreted from the report); (4) file write ran without asking, so the non-shell ask case was not exercised; (5) reported "no" for autoaccept, meaning needs clarification; (6) ask remained pending after reconnect but no banner appeared; (7) denial reasons appeared when the row was expanded; (8) no ask banner was seen with the composer open. Ticket remains open; root ask and reconnect behavior failed, and other-tool/autoaccept results need clarification.
+- 2026-10-20: Needs diagnosis. The manual report does not establish whether the CLI TUI entry loaded or whether the tested ask carried the plugin's branded message. Requesting the OpenCode version, redacted plugin config entries, startup plugin-load logs, and clarification of results 3 and 5.
