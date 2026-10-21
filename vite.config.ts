@@ -11,6 +11,7 @@ export default defineConfig({
     },
   },
   test: {
+    include: ["tests/**/*.test.ts"],
     setupFiles: ["tests/support/setup.ts"],
     alias: {
       "@opencode/plugin/tui": new URL("./tests/support/host-plugin-runtime.ts", import.meta.url)
