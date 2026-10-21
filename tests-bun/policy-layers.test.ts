@@ -1,10 +1,10 @@
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { afterEach, beforeEach, expect, test } from "vite-plus/test";
+import { afterEach, beforeEach, expect, test } from "bun:test";
 import { policyLocations } from "../src/policy-locations.ts";
 import { restoreEnvAfterEach } from "./support/env.ts";
-import { readLayeredPolicy } from "./support/project.ts";
+import { readLayeredPolicy } from "../tests/support/project.ts";
 
 restoreEnvAfterEach(["HOME", "XDG_CONFIG_HOME", "OPENCODE_CONFIG_DIR"]);
 
@@ -13,6 +13,7 @@ let globalDir: string;
 let globalFile: string;
 let xdgGlobalFile: string;
 let homeGlobalFile: string;
+let home: string;
 let project: string;
 let projectFile: string;
 let localFile: string;
@@ -22,12 +23,13 @@ beforeEach(async () => {
   globalDir = join(root, "global");
   globalFile = join(globalDir, "lovely-permissions.jsonc");
   xdgGlobalFile = join(root, "xdg", "opencode", "lovely-permissions.jsonc");
-  homeGlobalFile = join(root, "home", ".config", "opencode", "lovely-permissions.jsonc");
+  home = join(root, "home");
+  homeGlobalFile = join(home, ".config", "opencode", "lovely-permissions.jsonc");
   project = join(root, "project");
   projectFile = join(project, ".opencode", "lovely-permissions.jsonc");
   localFile = join(project, ".opencode", "lovely-permissions.local.jsonc");
 
-  process.env.HOME = join(root, "home");
+  process.env.HOME = home;
   process.env.XDG_CONFIG_HOME = join(root, "xdg");
   process.env.OPENCODE_CONFIG_DIR = globalDir;
 });
@@ -366,7 +368,7 @@ test("the global file is read from HOME/.config/opencode when neither variable i
   delete process.env.XDG_CONFIG_HOME;
   await writeAt(homeGlobalFile, JSON.stringify({ default: { "*": "deny" } }));
 
-  expect(await readLayeredPolicy(project)).toEqual({
+  expect(await readLayeredPolicy(project, process.env, home)).toEqual({
     status: "valid",
     modes: { default: { bash: {}, wildcard: "deny" } },
     warnings: [],

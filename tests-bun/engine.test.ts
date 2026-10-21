@@ -1,8 +1,8 @@
 import { dirname, join } from "node:path";
-import { describe, expect, test } from "vite-plus/test";
+import { describe, expect, test } from "bun:test";
 import { resolveEngine } from "../src/engine.ts";
 import { emptyPathDir, sandboxRoot } from "./support/sandbox.ts";
-import { stubEngine } from "./support/stub-engine.ts";
+import { stubEngine } from "../tests/support/stub-engine.ts";
 
 const RESPONSE = { protocol: 1, action: "allow", reason: "", reasons: [] };
 

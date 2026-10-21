@@ -1,8 +1,8 @@
 import { join } from "node:path";
-import { describe, expect, test } from "vite-plus/test";
+import { describe, expect, test } from "bun:test";
 import { EngineError, evaluate, validate, type EvaluateRequest } from "../src/engine-client.ts";
 import { sandboxRoot } from "./support/sandbox.ts";
-import { stubEngine } from "./support/stub-engine.ts";
+import { stubEngine } from "../tests/support/stub-engine.ts";
 
 const ALLOW = {
   protocol: 1,
@@ -34,7 +34,7 @@ describe("evaluate", () => {
       reason: "first reason; second reason",
       reasons: ["first reason", "second reason"],
     });
-    await expect(
+    expect(
       evaluate(engine.path, { command: "rm -rf /", bash: BASH, topLevel: "ask" }),
     ).resolves.toEqual({
       action: "ask",
@@ -49,7 +49,7 @@ describe("evaluate", () => {
     "rejects a response whose protocol is not 1 (%s), rather than returning a verdict",
     async (_, response) => {
       const engine = stubEngine(response);
-      await expect(
+      expect(
         evaluate(engine.path, { command: "git status", bash: BASH, topLevel: "ask" }),
       ).rejects.toThrow(/protocol/);
     },
@@ -61,7 +61,7 @@ describe("evaluate", () => {
       valid: false,
       error: "internal error: KeyError: 'op'",
     });
-    await expect(
+    expect(
       evaluate(engine.path, { command: "git status", bash: BASH, topLevel: "ask" }),
     ).rejects.toThrow("internal error: KeyError: 'op'");
   });
@@ -78,7 +78,7 @@ describe("evaluate", () => {
     "rejects when the engine does not answer with one JSON object (%j)",
     async (output) => {
       const engine = stubEngine(output);
-      await expect(
+      expect(
         evaluate(engine.path, { command: "git status", bash: BASH, topLevel: "ask" }),
       ).rejects.toThrow("did not answer with one JSON object");
     },
@@ -86,7 +86,7 @@ describe("evaluate", () => {
 
   test("rejects when the engine cannot be started", async () => {
     const missing = join(sandboxRoot, "missing", "lovely-pi-bash-permissions");
-    await expect(
+    expect(
       evaluate(missing, { command: "git status", bash: BASH, topLevel: "ask" }),
     ).rejects.toThrow(EngineError);
   });
@@ -101,7 +101,7 @@ describe("validate", () => {
 
   test("resolves valid when the engine accepts the block", async () => {
     const engine = stubEngine({ protocol: 1, valid: true });
-    await expect(validate(engine.path, BASH)).resolves.toEqual({ valid: true });
+    expect(validate(engine.path, BASH)).resolves.toEqual({ valid: true });
   });
 
   test("returns the engine's message when it rejects the block", async () => {
@@ -110,7 +110,7 @@ describe("validate", () => {
       valid: false,
       error: "*: Input should be 'allow', 'deny' or 'ask' (got 'alow')",
     });
-    await expect(validate(engine.path, { "*": "alow" })).resolves.toEqual({
+    expect(validate(engine.path, { "*": "alow" })).resolves.toEqual({
       valid: false,
       error: "*: Input should be 'allow', 'deny' or 'ask' (got 'alow')",
     });
@@ -118,11 +118,11 @@ describe("validate", () => {
 
   test("rejects a response whose protocol is not 1, rather than returning a result", async () => {
     const engine = stubEngine({ protocol: 2, valid: true });
-    await expect(validate(engine.path, BASH)).rejects.toThrow(/protocol/);
+    expect(validate(engine.path, BASH)).rejects.toThrow(/protocol/);
   });
 
   test("rejects an answer with no validation result", async () => {
     const engine = stubEngine({ protocol: 1 });
-    await expect(validate(engine.path, BASH)).rejects.toThrow(EngineError);
+    expect(validate(engine.path, BASH)).rejects.toThrow(EngineError);
   });
 });
