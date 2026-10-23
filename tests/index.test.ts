@@ -9,7 +9,7 @@ import { crashingEngine, evaluations, useEngine, type StubReply } from "./suppor
 
 const NOT_FOUND_DENIAL = [
   "[♡ perms: ❤️ auto-rejected]",
-  "- lovely-pi-bash-permissions was not found. Install it with `uv tool install lovely-bash-permissions`, or set LOVELY_PI_BASH_PERMISSIONS_BIN to the path of an existing engine binary.",
+  "- lovely-pi-bash-permissions was not found. Install it with `uv tool install git+https://github.com/justfortheloveof/lovely-bash-permissions`, or set LOVELY_PI_BASH_PERMISSIONS_BIN to the path of an existing engine binary.",
   "The tool has not been run.",
 ].join("\n");
 
@@ -402,7 +402,7 @@ describe("when the engine gives no answer", () => {
       effect: "deny",
       message: [
         "[♡ perms: ❤️ auto-rejected]",
-        "- the bash engine did not start or answer: it did not answer with one JSON object. Reinstall it with `uv tool install lovely-bash-permissions`, or set LOVELY_PI_BASH_PERMISSIONS_BIN to a working engine binary, then restart OpenCode.",
+        "- the bash engine did not start or answer: it did not answer with one JSON object. Reinstall it with `uv tool install git+https://github.com/justfortheloveof/lovely-bash-permissions`, or set LOVELY_PI_BASH_PERMISSIONS_BIN to a working engine binary, then restart OpenCode.",
         "The tool has not been run.",
       ].join("\n"),
     });
@@ -419,7 +419,7 @@ function unrunnableEngine(): string {
 describe("when the engine exits on start", () => {
   const DENIAL = [
     "[♡ perms: ❤️ auto-rejected]",
-    "- the bash engine did not start or answer: it exited with code 1 before answering. Reinstall it with `uv tool install lovely-bash-permissions`, or set LOVELY_PI_BASH_PERMISSIONS_BIN to a working engine binary, then restart OpenCode.",
+    "- the bash engine did not start or answer: it exited with code 1 before answering. Reinstall it with `uv tool install git+https://github.com/justfortheloveof/lovely-bash-permissions`, or set LOVELY_PI_BASH_PERMISSIONS_BIN to a working engine binary, then restart OpenCode.",
     "The tool has not been run.",
   ].join("\n");
 
@@ -484,7 +484,7 @@ describe("when the engine cannot be started", () => {
     expect(decision.message).toContain(path);
     expect(decision.message).toContain("EACCES");
     expect(decision.message).toContain(
-      "Reinstall it with `uv tool install lovely-bash-permissions`",
+      "Reinstall it with `uv tool install git+https://github.com/justfortheloveof/lovely-bash-permissions`",
     );
     expect(decision.message?.endsWith("The tool has not been run.")).toBe(true);
   });
@@ -492,7 +492,7 @@ describe("when the engine cannot be started", () => {
 
 describe("when the engine speaks another protocol version", () => {
   const FIX =
-    "Install an engine that speaks protocol 1 with `uv tool install --force lovely-bash-permissions`, or set LOVELY_PI_BASH_PERMISSIONS_BIN to one, or update this plugin to a version that matches the engine, then restart OpenCode.";
+    "Install an engine that speaks protocol 1 with `uv tool install --force git+https://github.com/justfortheloveof/lovely-bash-permissions`, or set LOVELY_PI_BASH_PERMISSIONS_BIN to one, or update this plugin to a version that matches the engine, then restart OpenCode.";
 
   test("every shell call is denied with the protocol message, naming the fix", async () => {
     useEngine({ protocol: 2, valid: true });

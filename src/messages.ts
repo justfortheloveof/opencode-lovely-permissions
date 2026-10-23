@@ -4,6 +4,10 @@ import { ASK_LABEL, DENY_LABEL, NOT_RUN } from "./labels.ts";
 
 export { ASK_LABEL, DENY_LABEL, NOT_RUN };
 
+const ENGINE_INSTALL_SOURCE = "git+https://github.com/justfortheloveof/lovely-bash-permissions";
+const ENGINE_INSTALL_COMMAND = `uv tool install ${ENGINE_INSTALL_SOURCE}`;
+const ENGINE_REINSTALL_COMMAND = `uv tool install --force ${ENGINE_INSTALL_SOURCE}`;
+
 /** The closing sentence as the engine writes it, which has no full stop. */
 const ENGINE_NOT_RUN = /\s*The tool has not been run\.?$/;
 
@@ -42,16 +46,16 @@ function rejectedSource(files: readonly string[]): string {
 }
 
 export function engineUnusableReason(detail: string): string {
-  return `the bash engine did not start or answer: ${detail}. Reinstall it with \`uv tool install lovely-bash-permissions\`, or set ${ENGINE_OVERRIDE} to a working engine binary, then restart OpenCode.`;
+  return `the bash engine did not start or answer: ${detail}. Reinstall it with \`${ENGINE_INSTALL_COMMAND}\`, or set ${ENGINE_OVERRIDE} to a working engine binary, then restart OpenCode.`;
 }
 
 export function protocolMismatchReason(found: unknown): string {
   const answered =
     found === undefined ? "no protocol version" : `protocol ${JSON.stringify(found)}`;
-  return `the bash engine answered with ${answered}, but this plugin needs protocol ${PROTOCOL_VERSION}. Install an engine that speaks protocol ${PROTOCOL_VERSION} with \`uv tool install --force lovely-bash-permissions\`, or set ${ENGINE_OVERRIDE} to one, or update this plugin to a version that matches the engine, then restart OpenCode.`;
+  return `the bash engine answered with ${answered}, but this plugin needs protocol ${PROTOCOL_VERSION}. Install an engine that speaks protocol ${PROTOCOL_VERSION} with \`${ENGINE_REINSTALL_COMMAND}\`, or set ${ENGINE_OVERRIDE} to one, or update this plugin to a version that matches the engine, then restart OpenCode.`;
 }
 
-export const ENGINE_NOT_FOUND_REASON = `${ENGINE_BINARY} was not found. Install it with \`uv tool install lovely-bash-permissions\`, or set ${ENGINE_OVERRIDE} to the path of an existing engine binary.`;
+export const ENGINE_NOT_FOUND_REASON = `${ENGINE_BINARY} was not found. Install it with \`${ENGINE_INSTALL_COMMAND}\`, or set ${ENGINE_OVERRIDE} to the path of an existing engine binary.`;
 
 export function unknownModeReason(mode: string, modes: readonly string[]): string {
   const names = modes.map((name) => `"${name}"`).join(", ");

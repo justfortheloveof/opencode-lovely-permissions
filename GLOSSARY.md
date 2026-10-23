@@ -22,6 +22,9 @@ _Avoid_: block (Devin's wire word)
 The `bash` block of a mode in the config file. It decides verdicts for bash commands.
 _Avoid_: config, rules
 
+**Policy file**:
+A configuration file containing one or more modes, each with a bash policy.
+
 **Mode**:
 A named policy in the config file. `default` is required. One mode applies per setup, chosen by the plugin's `mode` option.
 
