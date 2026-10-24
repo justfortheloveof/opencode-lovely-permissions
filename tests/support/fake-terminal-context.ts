@@ -10,7 +10,7 @@ interface PendingPermission {
 
 interface SessionInfo {
   readonly parentID?: string;
-  readonly location?: { readonly directory: string; readonly workspaceID?: string };
+  readonly location?: LocationRef;
 }
 
 interface LocationRef {
@@ -53,6 +53,8 @@ export interface TerminalPluginHarness {
   readonly modeChanges: Array<{ readonly mode: string; readonly location?: LocationRef }>;
   /** Toasts shown by the plugin. */
   readonly toasts: unknown[];
+  /** Custom dialogs shown by the plugin. */
+  readonly customDialogs: Array<() => JSX.Element>;
   /** Alert dialogs shown by the plugin. */
   readonly alertRequests: Array<{ readonly title: string; readonly message: string }>;
   /** Runs the registered composer-top slot with the host-provided input. */
@@ -91,6 +93,7 @@ export async function startTerminalPlugin(
   const modeListLocations: Array<LocationRef | undefined> = [];
   const modeChanges: TerminalPluginHarness["modeChanges"] = [];
   const toasts: unknown[] = [];
+  const customDialogs: TerminalPluginHarness["customDialogs"] = [];
   const alertRequests: TerminalPluginHarness["alertRequests"] = [];
   const commands: Array<{ id?: string; slash?: { name: string }; run: () => unknown }> = [];
   const slots: RecordedSlot[] = [];
@@ -166,6 +169,9 @@ export async function startTerminalPlugin(
     },
     ui: {
       dialog: {
+        show(render: () => JSX.Element): void {
+          customDialogs.push(render);
+        },
         alert(options: { title: string; message: string }): Promise<void> {
           alertRequests.push(options);
           return Promise.resolve();
@@ -221,6 +227,7 @@ export async function startTerminalPlugin(
     modeListLocations,
     modeChanges,
     toasts,
+    customDialogs,
     alertRequests,
     render(input) {
       const slot = slots.find(({ path }) => path === "session.composer.top");

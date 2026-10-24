@@ -74,10 +74,19 @@ export default Plugin.define({
               return;
             }
             if (loaded.status === "absent" || loaded.modes.length === 0) {
-              await context.ui.dialog.alert({
-                title: "Lovely permissions Mode",
-                message: "No modes configured.",
-              });
+              context.ui.dialog.show(() => (
+                <box
+                  title="Lovely permissions Mode"
+                  border
+                  borderStyle="rounded"
+                  padding={1}
+                  flexDirection="column"
+                  gap={1}
+                >
+                  <text>No modes configured.</text>
+                  <text>esc to close</text>
+                </box>
+              ));
               return;
             }
 

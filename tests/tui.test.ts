@@ -82,14 +82,18 @@ describe("terminal plugin", () => {
     expect(harness.modeChanges).toEqual([]);
   });
 
-  test("shows an empty-state modal when no Modes are configured", async () => {
+  test("shows a picker-style empty state when no Modes are configured", async () => {
     const harness = await startTerminalPlugin({}, { modeList: { status: "absent" } });
 
     await harness.runCommand("lovely-permissions-cfg");
 
-    expect(harness.alertRequests).toEqual([
-      { title: "Lovely permissions Mode", message: "No modes configured." },
-    ]);
+    expect(harness.customDialogs).toHaveLength(1);
+    const frame = await withTestRender(harness.customDialogs[0]!, (setup) =>
+      visibleText(setup.captureCharFrame()),
+    );
+    expect(frame).toContain("No modes configured.");
+    expect(frame).toContain("Lovely permissions Mode");
+    expect(harness.alertRequests).toEqual([]);
     expect(harness.pickerRequests).toEqual([]);
     expect(harness.modeChanges).toEqual([]);
     expect(harness.toasts).toEqual([]);
