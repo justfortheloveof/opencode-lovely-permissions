@@ -1,6 +1,7 @@
 import { Plugin } from "@opencode/plugin/tui";
 import { onMount } from "solid-js";
 import { pickAskBannerMessage } from "./ask-banner.ts";
+import { MODE_RPC } from "./mode-rpc.ts";
 
 interface AskBannerProps {
   readonly context: Plugin.Context;
@@ -50,6 +51,36 @@ function AskBannerSlot(props: AskBannerProps) {
 export default Plugin.define({
   id: "lovely-bash-permissions",
   setup(context) {
+    context.keymap.layer(() => ({
+      commands: [
+        {
+          id: "lovely-permissions-cfg",
+          title: "Switch lovely permissions Mode",
+          description: "Temporarily switch the bash permissions Mode for this location",
+          slash: { name: "lovely-permissions-cfg" },
+          run: async () => {
+            const route = context.ui.router.current();
+            if (route.type !== "session") return;
+
+            const location =
+              context.data.session.get(route.sessionID)?.location ?? context.location;
+            const modes = context.client.rpc(MODE_RPC);
+            const loaded = await modes.listModes({}, { location });
+            if (loaded.status !== "ready" || loaded.modes.length === 0) return;
+
+            const selected = await context.ui.dialog.select({
+              title: "Lovely permissions Mode",
+              options: loaded.modes.map((mode) => ({ title: mode, value: mode })),
+              current: loaded.activeMode,
+            });
+            if (selected === undefined) return;
+
+            await modes.setMode({ mode: selected }, { location });
+          },
+        },
+      ],
+    }));
+
     return context.ui.slot({
       append: "session.composer.top",
       render: ({ sessionID }) => <AskBannerSlot context={context} sessionID={sessionID} />,

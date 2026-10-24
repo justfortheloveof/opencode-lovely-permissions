@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync } from "node:fs";
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { beforeEach, describe, expect, test } from "bun:test";
 import { judge, startPlugin, type PermissionDecision } from "./support/fake-context.ts";
@@ -142,6 +142,148 @@ describe("the engine request", () => {
     const harness = await startPlugin();
     await judge(harness, "call_no_policy", "git status", "allow");
     expect(engine.requests()).toEqual([{ op: "validate", config: {} }]);
+  });
+});
+
+describe("temporary Mode selection", () => {
+  test("reports the distinct loaded Modes and the configured active Mode", async () => {
+    useEngine({ protocol: 1, valid: true });
+    const globalDirectory = mkdtempSync(join(sandboxRoot, "mode-config-"));
+    process.env.OPENCODE_CONFIG_DIR = globalDirectory;
+    writeFileSync(
+      join(globalDirectory, "lovely-permissions.jsonc"),
+      JSON.stringify({ default: {}, personal: {} }),
+    );
+    const project = projectWith({ default: {}, strict: { bash: { "*": "deny" } } });
+    writeFileSync(
+      join(project, ".opencode", "lovely-permissions.local.jsonc"),
+      JSON.stringify({ default: {}, strict: {}, local: {} }),
+    );
+    const harness = await startPlugin(project, { mode: "strict" });
+
+    expect(await harness.modeList()).toEqual({
+      status: "ready",
+      modes: ["default", "personal", "strict", "local"],
+      activeMode: "strict",
+    });
+  });
+
+  test("keeps overrides in memory and reloads the configured Mode or default", async () => {
+    useEngine({ protocol: 1, valid: true });
+    const project = projectWith({ default: {}, strict: { bash: { "*": "deny" } } });
+    const harness = await startPlugin(project, { mode: "strict" });
+
+    expect(await harness.setMode("default")).toEqual({ status: "changed", activeMode: "default" });
+    expect(await harness.setMode("default")).toEqual({
+      status: "unchanged",
+      activeMode: "default",
+    });
+
+    const reloaded = await startPlugin(project, { mode: "strict" });
+    const defaulted = await startPlugin(project);
+    expect(await reloaded.modeList()).toMatchObject({ status: "ready", activeMode: "strict" });
+    expect(await defaulted.modeList()).toMatchObject({ status: "ready", activeMode: "default" });
+  });
+
+  test("applies a validated Mode to later permission evaluations", async () => {
+    const strictBash = { blocked_cmds_regex: ["^rm\\s+-rf$"] };
+    const engine = useEngine(verdict("allow", ALLOW_REASONS));
+    const harness = await startPlugin(
+      projectWith({
+        default: { bash: { allowed_cmds_regex: ["^git\\s+status$"] } },
+        strict: { bash: strictBash },
+      }),
+    );
+
+    expect(await harness.setMode("strict")).toEqual({
+      status: "changed",
+      activeMode: "strict",
+    });
+    await judge(harness, "call_after_mode_change", "git status");
+
+    expect(evaluations(engine)).toEqual([
+      { op: "evaluate", command: "git status", config: strictBash, top_level: "ask" },
+    ]);
+  });
+
+  test("keeps the Policy captured by a permission evaluation already in progress", async () => {
+    const defaultBash = { error: "ask" };
+    const engine = useEngine(verdict("allow", ALLOW_REASONS), {
+      byCommand: { "sleep 100": NEVER_ANSWERS },
+    });
+    const harness = await startPlugin(
+      projectWith({ default: { bash: defaultBash }, strict: { bash: { error: "deny" } } }),
+    );
+    await harness.startCall({
+      tool: "shell",
+      id: "call_in_progress",
+      input: { command: "sleep 100" },
+    });
+    const pendingEvaluation = harness.evaluate({
+      action: "shell",
+      resources: ["sleep 100"],
+      effect: "allow",
+      source: { type: "tool", messageID: "msg_test", id: "call_in_progress" },
+    });
+
+    expect(await harness.setMode("strict")).toEqual({
+      status: "changed",
+      activeMode: "strict",
+    });
+    expect(await pendingEvaluation).toMatchObject({ effect: "ask" });
+    expect(evaluations(engine)[0]).toEqual({
+      op: "evaluate",
+      command: "sleep 100",
+      config: defaultBash,
+      top_level: "ask",
+    });
+  }, 15_000);
+
+  test("keeps the active Mode when the engine rejects a candidate Policy", async () => {
+    const defaultBash = { allowed_cmds_regex: ["^git\\s+status$"] };
+    const strictBash = { blocked_cmds_regex: ["^rm\\s+-rf$"] };
+    useEngine(verdict("allow", ALLOW_REASONS), {
+      byConfig: {
+        [JSON.stringify(strictBash)]: {
+          protocol: 1,
+          valid: false,
+          error: "invalid strict bash block",
+        },
+      },
+    });
+    const harness = await startPlugin(
+      projectWith({ default: { bash: defaultBash }, strict: { bash: strictBash } }),
+    );
+
+    expect(await harness.setMode("strict")).toEqual({
+      status: "invalid-policy",
+      mode: "strict",
+    });
+    expect(await harness.modeList()).toMatchObject({ status: "ready", activeMode: "default" });
+  });
+
+  test("does not treat an engine validation failure as an invalid candidate Policy", async () => {
+    const strictBash = { blocked_cmds_regex: ["^rm\\s+-rf$"] };
+    useEngine(verdict("allow", ALLOW_REASONS), {
+      byConfig: { [JSON.stringify(strictBash)]: { protocol: 1, valid: false } },
+    });
+    const harness = await startPlugin(projectWith({ default: {}, strict: { bash: strictBash } }));
+
+    expect(await harness.setMode("strict")).toEqual({ status: "engine-failed" });
+    expect(await harness.modeList()).toMatchObject({ status: "ready", activeMode: "default" });
+  });
+
+  test("preserves OpenCode's explicit deny after switching Modes", async () => {
+    useEngine(verdict("allow", ALLOW_REASONS));
+    const harness = await startPlugin(
+      projectWith({ default: {}, strict: { bash: { "*": "deny" } } }),
+    );
+    await harness.setMode("strict");
+
+    expect(await judge(harness, "call_explicit_deny_after_switch", "git status", "deny")).toEqual({
+      effect: "deny",
+      message: undefined,
+    });
   });
 });
 

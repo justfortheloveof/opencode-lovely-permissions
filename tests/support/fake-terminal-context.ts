@@ -1,6 +1,7 @@
 import type { Plugin } from "@opencode/plugin/tui";
 import { createSignal } from "solid-js";
 import type { JSX } from "@opentui/solid";
+import type { ModeList, SetModeResult } from "../../src/mode-rpc.ts";
 import tuiPlugin from "../../src/tui.tsx";
 
 interface PendingPermission {
@@ -9,6 +10,12 @@ interface PendingPermission {
 
 interface SessionInfo {
   readonly parentID?: string;
+  readonly location?: { readonly directory: string; readonly workspaceID?: string };
+}
+
+interface LocationRef {
+  readonly directory: string;
+  readonly workspaceID?: string;
 }
 
 interface SlotInput {
@@ -32,10 +39,26 @@ export interface TerminalPluginHarness {
   readonly permissionLookups: string[];
   /** Session IDs whose pending permissions were synced when the slot mounted. */
   readonly permissionSyncs: string[];
+  /** Slash command names registered by the plugin. */
+  readonly slashCommands: string[];
+  /** Mode picker dialogs opened by the plugin command. */
+  readonly pickerRequests: Array<{
+    readonly title: string;
+    readonly options: readonly { readonly title: string; readonly value: string }[];
+    readonly current?: string;
+  }>;
+  /** Locations used for Mode-list RPC calls. */
+  readonly modeListLocations: Array<LocationRef | undefined>;
+  /** Mode-change RPC inputs and locations. */
+  readonly modeChanges: Array<{ readonly mode: string; readonly location?: LocationRef }>;
+  /** Toasts shown by the plugin. */
+  readonly toasts: unknown[];
   /** Runs the registered composer-top slot with the host-provided input. */
   render(input: SlotInput): JSX.Element;
   /** Replaces a session's pending permissions and updates an active render. */
   setPermissions(sessionID: string, permissions: readonly PendingPermission[]): void;
+  /** Runs a registered slash command by its name. */
+  runCommand(name: string): Promise<void>;
   /** Runs the terminal plugin's cleanup hook. */
   dispose(): Promise<void>;
 }
@@ -45,6 +68,11 @@ interface SessionState {
   readonly familyBySession?: Readonly<Record<string, readonly string[]>>;
   readonly permissionsAfterSync?: Readonly<Record<string, readonly PendingPermission[]>>;
   readonly syncFailure?: Error;
+  readonly modeList?: ModeList;
+  readonly selectedMode?: string;
+  readonly route?:
+    | { readonly type: "session"; readonly sessionID: string }
+    | { readonly type: "home" };
 }
 
 /** Runs the terminal plugin against fake pending permissions and records its slots. */
@@ -55,6 +83,12 @@ export async function startTerminalPlugin(
   const registered: string[] = [];
   const permissionLookups: string[] = [];
   const permissionSyncs: string[] = [];
+  const slashCommands: string[] = [];
+  const pickerRequests: TerminalPluginHarness["pickerRequests"] = [];
+  const modeListLocations: Array<LocationRef | undefined> = [];
+  const modeChanges: TerminalPluginHarness["modeChanges"] = [];
+  const toasts: unknown[] = [];
+  const commands: Array<{ id?: string; slash?: { name: string }; run: () => unknown }> = [];
   const slots: RecordedSlot[] = [];
   const permissions = new Map<
     string,
@@ -77,6 +111,30 @@ export async function startTerminalPlugin(
   }
 
   const context = {
+    location: { directory: "/current" },
+    client: {
+      rpc(definition: { id: string }) {
+        if (definition.id !== "lovely-bash-permissions") {
+          throw new Error(`unexpected RPC definition: ${definition.id}`);
+        }
+        return {
+          async listModes(
+            _input: Record<string, never>,
+            options?: { location?: LocationRef },
+          ): Promise<ModeList> {
+            modeListLocations.push(options?.location);
+            return sessionState.modeList ?? { status: "absent" };
+          },
+          async setMode(
+            input: { mode: string },
+            options?: { location?: LocationRef },
+          ): Promise<SetModeResult> {
+            modeChanges.push({ mode: input.mode, location: options?.location });
+            return { status: "changed", activeMode: input.mode };
+          },
+        };
+      },
+    },
     data: {
       session: {
         get(sessionID: string) {
@@ -103,6 +161,26 @@ export async function startTerminalPlugin(
       },
     },
     ui: {
+      dialog: {
+        select<Value>(options: {
+          title: string;
+          options: readonly { title: string; value: Value }[];
+          current?: Value;
+        }): Promise<Value | undefined> {
+          pickerRequests.push(options as TerminalPluginHarness["pickerRequests"][number]);
+          return Promise.resolve(sessionState.selectedMode as Value | undefined);
+        },
+      },
+      toast: {
+        show(message: unknown) {
+          toasts.push(message);
+        },
+      },
+      router: {
+        current() {
+          return sessionState.route ?? { type: "session", sessionID: "ses_viewed" };
+        },
+      },
       slot(claim: SlotClaim) {
         registered.push(claim.append);
         slots.push({ path: claim.append, render: claim.render });
@@ -114,6 +192,14 @@ export async function startTerminalPlugin(
         };
       },
     },
+    keymap: {
+      layer(factory: () => { commands?: ReadonlyArray<(typeof commands)[number]> }) {
+        for (const command of factory().commands ?? []) {
+          commands.push(command);
+          if (command.slash !== undefined) slashCommands.push(command.slash.name);
+        }
+      },
+    },
   } as unknown as Plugin.Context;
 
   const cleanup = await tuiPlugin.setup(context);
@@ -122,6 +208,11 @@ export async function startTerminalPlugin(
     registered,
     permissionLookups,
     permissionSyncs,
+    slashCommands,
+    pickerRequests,
+    modeListLocations,
+    modeChanges,
+    toasts,
     render(input) {
       const slot = slots.find(({ path }) => path === "session.composer.top");
       if (slot === undefined) throw new Error("the plugin did not register session.composer.top");
@@ -129,6 +220,11 @@ export async function startTerminalPlugin(
     },
     setPermissions(sessionID, nextPermissions) {
       permissionSignal(sessionID).set(nextPermissions);
+    },
+    async runCommand(name) {
+      const command = commands.find(({ id, slash }) => id === name || slash?.name === name);
+      if (command === undefined) throw new Error(`the plugin did not register /${name}`);
+      await command.run();
     },
     async dispose() {
       if (typeof cleanup === "function") await cleanup();

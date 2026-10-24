@@ -11,6 +11,7 @@ import {
   protocolMismatchReason,
   UNMATCHED_REASON,
 } from "./messages.ts";
+import { MODE_RPC, type ModeList, type SetModeResult } from "./mode-rpc.ts";
 import { selectMode } from "./mode.ts";
 import { DEFAULT_MODE, type ModePolicy } from "./policy-file.ts";
 import { policyLocations } from "./policy-locations.ts";
@@ -25,6 +26,7 @@ export default Plugin.define({
     const engine = resolveEngine();
     const directory = ctx.location.directory;
     const mode = String(ctx.options.mode ?? DEFAULT_MODE);
+    let activeMode = mode;
     const locations = policyLocations(directory);
     const layers = await readLayers(locations);
     const policy = layeredPolicy(layers);
@@ -33,16 +35,49 @@ export default Plugin.define({
     }
     let startup = await checkStartup(engine, selectMode(policy, mode), bashSources(layers, mode));
 
+    await ctx.rpc.register(MODE_RPC, {
+      listModes: async () => modeList(policy, activeMode),
+      setMode: async ({ mode: requestedMode }): Promise<SetModeResult> => {
+        if (policy.status === "invalid") {
+          return { status: "invalid-policy", mode: requestedMode };
+        }
+        if (policy.status === "absent" || !Object.hasOwn(policy.modes, requestedMode)) {
+          return { status: "invalid-mode", mode: requestedMode };
+        }
+        if (activeMode === requestedMode && startup.status === "ready") {
+          return { status: "unchanged", activeMode };
+        }
+
+        const candidate = await checkStartup(
+          engine,
+          selectMode(policy, requestedMode),
+          bashSources(layers, requestedMode),
+        );
+        if (candidate.status === "failed") {
+          return candidate.kind === "policy"
+            ? { status: "invalid-policy", mode: requestedMode }
+            : { status: "engine-failed" };
+        }
+        if (candidate.status !== "ready") return { status: "invalid-mode", mode: requestedMode };
+
+        const status = activeMode === requestedMode ? "unchanged" : "changed";
+        activeMode = requestedMode;
+        startup = candidate;
+        return { status, activeMode };
+      },
+    });
+
     await ctx.tool.hook("execute.before", recordCommand);
     await ctx.tool.hook("execute.after", forgetCommand);
     await ctx.permission.hook("evaluate", async (event) => {
       if (event.action !== SHELL_ACTION) return;
-      if (startup.status === "failed") {
-        deny(event, startup.message);
+      const evaluatedStartup = startup;
+      if (evaluatedStartup.status === "failed") {
+        deny(event, evaluatedStartup.message);
         return;
       }
       if (event.effect === "deny") return;
-      if (startup.status === "no-policy") {
+      if (evaluatedStartup.status === "no-policy") {
         event.effect = "ask";
         event.message = noPolicyMessage(locations);
         return;
@@ -53,7 +88,10 @@ export default Plugin.define({
         return;
       }
       try {
-        applyVerdict(event, await verdictFor(startup.engine, command, startup.mode));
+        applyVerdict(
+          event,
+          await verdictFor(evaluatedStartup.engine, command, evaluatedStartup.mode),
+        );
       } catch (error) {
         if (!(error instanceof ProtocolMismatchError)) throw error;
         startup = failure(protocolMismatchReason(error.found));
@@ -62,6 +100,12 @@ export default Plugin.define({
     });
   },
 });
+
+function modeList(policy: ReturnType<typeof layeredPolicy>, activeMode: string): ModeList {
+  if (policy.status === "absent") return { status: "absent" };
+  if (policy.status === "invalid") return { status: "invalid" };
+  return { status: "ready", modes: Object.keys(policy.modes), activeMode };
+}
 
 async function verdictFor(engine: string, command: string, mode: ModePolicy): Promise<Verdict> {
   try {

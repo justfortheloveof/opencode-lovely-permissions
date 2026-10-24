@@ -37,10 +37,11 @@ test("the plugin has a stable identifier", () => {
   expect(plugin.id).toBe("lovely-bash-permissions");
 });
 
-test("setup registers the shell execute-before and execute-after hooks and the permission evaluate hook", async () => {
+test("setup registers the permission hooks and the Mode RPC", async () => {
   const harness = await startPlugin();
   expect([...harness.registered].sort()).toEqual([
     "permission.evaluate",
+    "rpc.lovely-bash-permissions",
     "tool.execute.after",
     "tool.execute.before",
   ]);

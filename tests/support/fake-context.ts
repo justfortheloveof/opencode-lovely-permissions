@@ -1,6 +1,7 @@
 import type { Plugin } from "@opencode/plugin";
 import type { PermissionEvaluation } from "@opencode/plugin/promise/permission";
 import plugin from "../../src/index.ts";
+import type { ModeList, SetModeResult } from "../../src/mode-rpc.ts";
 import { emptyProjectDir } from "./sandbox-core.ts";
 
 type Hook = (event: never) => unknown;
@@ -26,6 +27,10 @@ export interface ToolCall {
 export interface PluginHarness {
   /** Hook names the plugin registered, as `domain.name`, e.g. `permission.evaluate`. */
   readonly registered: string[];
+  /** Reads the server's loaded Mode snapshot through its registered RPC. */
+  modeList(): Promise<ModeList>;
+  /** Requests a temporary Mode change through the registered RPC. */
+  setMode(mode: string): Promise<SetModeResult>;
   /** Runs the registered permission evaluate hook on one request and returns the effect and message it left. */
   evaluate(request: PermissionRequest): Promise<PermissionDecision>;
   /** Runs the registered tool execute-before hook, as OpenCode does when a call starts. */
@@ -47,6 +52,12 @@ export async function startPlugin(
 ): Promise<PluginHarness> {
   const hooks = new Map<string, Hook>();
   const registered: string[] = [];
+  let modeHandlers:
+    | {
+        listModes(input: Record<string, never>): Promise<ModeList>;
+        setMode(input: { mode: string }): Promise<SetModeResult>;
+      }
+    | undefined;
   const registration = { dispose: async () => {} };
   const register = (domain: string) => async (name: string, callback: Hook) => {
     registered.push(`${domain}.${name}`);
@@ -56,6 +67,13 @@ export async function startPlugin(
   const context = {
     location: { directory },
     options,
+    rpc: {
+      async register(definition: { id: string }, handlers: typeof modeHandlers) {
+        registered.push(`rpc.${definition.id}`);
+        modeHandlers = handlers;
+        return registration;
+      },
+    },
     tool: { hook: register("tool") },
     permission: { hook: register("permission") },
   } as unknown as Plugin.Context;
@@ -76,6 +94,14 @@ export async function startPlugin(
 
   return {
     registered,
+    async modeList() {
+      if (modeHandlers === undefined) throw new Error("the plugin did not register Mode RPC");
+      return modeHandlers.listModes({});
+    },
+    async setMode(mode) {
+      if (modeHandlers === undefined) throw new Error("the plugin did not register Mode RPC");
+      return modeHandlers.setMode({ mode });
+    },
     async startCall(call) {
       await runToolHook("tool.execute.before", call, {});
     },

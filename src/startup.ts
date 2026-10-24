@@ -20,7 +20,7 @@ export type Startup =
   | { status: "no-policy" }
   | Failed;
 
-export type Failed = { status: "failed"; message: string };
+export type Failed = { status: "failed"; message: string; kind: "engine" | "policy" };
 
 /**
  * Checks the engine and the selected mode before the first shell call. Each file's bash
@@ -31,17 +31,19 @@ export async function checkStartup(
   selection: ModeSelection,
   sources: readonly BashSource[],
 ): Promise<Startup> {
-  if (engine === undefined) return failure(ENGINE_NOT_FOUND_REASON);
+  if (engine === undefined) return failure(ENGINE_NOT_FOUND_REASON, "engine");
   if (selection.status === "invalid") {
-    return failure(invalidPolicyReason(selection.file, selection.reason));
+    return failure(invalidPolicyReason(selection.file, selection.reason), "policy");
   }
-  if (selection.status === "unknown-mode") return failure(selection.reason);
+  if (selection.status === "unknown-mode") return failure(selection.reason, "policy");
 
   const mergedBash = selection.status === "valid" ? selection.policy.bash : {};
   try {
     for (const source of sources) {
       const single = await validate(engine, source.bash);
-      if (!single.valid) return failure(rejectedPolicyReason([source.file], single.error));
+      if (!single.valid) {
+        return failure(rejectedPolicyReason([source.file], single.error), "policy");
+      }
     }
     const merged = await validate(engine, mergedBash);
     if (!merged.valid) {
@@ -50,11 +52,17 @@ export async function checkStartup(
           sources.map((source) => source.file),
           merged.error,
         ),
+        "policy",
       );
     }
   } catch (error) {
-    if (error instanceof ProtocolMismatchError) return failure(protocolMismatchReason(error.found));
-    return failure(engineUnusableReason(error instanceof Error ? error.message : String(error)));
+    if (error instanceof ProtocolMismatchError) {
+      return failure(protocolMismatchReason(error.found), "engine");
+    }
+    return failure(
+      engineUnusableReason(error instanceof Error ? error.message : String(error)),
+      "engine",
+    );
   }
 
   if (selection.status === "absent") return { status: "no-policy" };
@@ -66,6 +74,6 @@ export async function checkStartup(
 }
 
 /** The failed state for one reason: every shell call is denied with the reason as its message. */
-export function failure(reason: string): Failed {
-  return { status: "failed", message: denyMessage([reason]) };
+export function failure(reason: string, kind: Failed["kind"] = "engine"): Failed {
+  return { status: "failed", message: denyMessage([reason]), kind };
 }

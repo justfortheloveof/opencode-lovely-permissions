@@ -86,6 +86,18 @@ The plugin uses `default` unless you set the `mode` option:
 
 Define `strict` alongside `default` in a policy file.
 
+### Switch a Mode for this session location
+
+When the plugin's TUI entry is loaded through the terminal CLI configuration above, run
+`/lovely-permissions-cfg` without arguments. The picker lists the distinct Modes from the merged policy files for the
+current session location and marks the active Mode. Choosing a Mode applies it immediately to future shell permission
+checks for that location, including its other sessions and subagent sessions. Cancelling leaves the Mode unchanged.
+
+This selection is temporary: it does not edit policy or OpenCode configuration, and a server restart or plugin reload
+restores the configured `mode` option (or `default` when it is unset). The TUI command is loaded separately from
+permission enforcement: add the plugin to `cli.json` as shown in [Terminal CLI](#terminal-cli), and load the server
+plugin through `opencode.jsonc` as shown in [Plugin](#plugin).
+
 ## Development
 
 ```bash

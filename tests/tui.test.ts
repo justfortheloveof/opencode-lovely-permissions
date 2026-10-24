@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { startTerminalPlugin } from "./support/fake-terminal-context.ts";
 import { withTestRender } from "./support/test-render.ts";
+import type { ModeList } from "../src/mode-rpc.ts";
 
 function visibleText(frame: string): string {
   return frame
@@ -34,6 +35,51 @@ describe("terminal plugin", () => {
     expect(harness.registered).toContain("session.composer.top");
     expect(harness.permissionLookups).toEqual(["ses_viewed"]);
     expect(harness.permissionSyncs).toEqual(["ses_viewed"]);
+  });
+
+  test("opens the loaded Mode picker and applies the selected Mode for the session location", async () => {
+    const modeList: ModeList = {
+      status: "ready",
+      modes: ["default", "strict"],
+      activeMode: "default",
+    };
+    const harness = await startTerminalPlugin(
+      {},
+      {
+        modeList,
+        selectedMode: "strict",
+        sessionsByID: { ses_viewed: { location: { directory: "/project" } } },
+      },
+    );
+
+    await harness.runCommand("lovely-permissions-cfg");
+
+    expect(harness.slashCommands).toContain("lovely-permissions-cfg");
+    expect(harness.pickerRequests).toHaveLength(1);
+    expect(harness.pickerRequests[0]).toMatchObject({
+      current: "default",
+      options: [
+        { title: "default", value: "default" },
+        { title: "strict", value: "strict" },
+      ],
+    });
+    expect(harness.modeListLocations).toEqual([{ directory: "/project" }]);
+    expect(harness.modeChanges).toEqual([{ mode: "strict", location: { directory: "/project" } }]);
+    expect(harness.toasts).toEqual([]);
+  });
+
+  test("cancelling the Mode picker leaves the server unchanged", async () => {
+    const harness = await startTerminalPlugin(
+      {},
+      {
+        modeList: { status: "ready", modes: ["default", "strict"], activeMode: "default" },
+      },
+    );
+
+    await harness.runCommand("lovely-permissions-cfg");
+
+    expect(harness.pickerRequests).toHaveLength(1);
+    expect(harness.modeChanges).toEqual([]);
   });
 
   test("syncs the viewed session and its family on mount before displaying its pending ask", async () => {
