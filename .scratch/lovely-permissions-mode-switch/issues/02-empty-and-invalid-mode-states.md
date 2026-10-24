@@ -4,14 +4,14 @@
 
 **Blocked by:** 01 (Switch the active Mode from the TUI picker).
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] With no policy files contributing Modes, the picker displays a picker-style empty state reading “No modes configured.”
-- [ ] Missing Modes do not throw during server setup, unload the permission hook, or trigger a startup toast.
-- [ ] With no Modes configured, non-denied shell permission requests ask for approval and their reason list starts with “No modes configured; defaulting to ask.”
-- [ ] The existing bullets identifying missing global, project, and local policy-file locations remain in the ask message and appear in the existing TUI ask banner.
-- [ ] An explicit OpenCode deny remains a deny when no Modes are configured.
-- [ ] Invalid loaded configuration is reported in the picker as “Configuration invalid,” rather than as an empty configuration.
-- [ ] Selecting a configured Mode whose Policy is rejected by the engine leaves the active Mode unchanged and displays “Configuration invalid for mode <name>.”
-- [ ] Invalid loaded Policy continues to use the existing fail-closed permission behavior.
-- [ ] Tests cover the permission hook and TUI states using the existing fake contexts and stub engine; no test starts or contacts a real OpenCode server.
+- [x] With no policy files contributing Modes, the picker displays a picker-style empty state reading “No modes configured.”
+- [x] Missing Modes do not throw during server setup, unload the permission hook, or trigger a startup toast.
+- [x] With no Modes configured, non-denied shell permission requests ask for approval and their reason list starts with “No modes configured; defaulting to ask.”
+- [x] The existing bullets identifying missing global, project, and local policy-file locations remain in the ask message and appear in the existing TUI ask banner.
+- [x] An explicit OpenCode deny remains a deny when no Modes are configured.
+- [x] Invalid loaded configuration is reported in the picker as “Configuration invalid,” rather than as an empty configuration.
+- [x] Selecting a configured Mode whose Policy is rejected by the engine leaves the active Mode unchanged and displays “Configuration invalid for mode <name>.”
+- [x] Invalid loaded Policy continues to use the existing fail-closed permission behavior.
+- [x] Tests cover the permission hook and TUI states using the existing fake contexts and stub engine; no test starts or contacts a real OpenCode server.
