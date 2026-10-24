@@ -1,6 +1,6 @@
 # Triage Labels
 
-The skills speak in terms of five canonical triage roles. This file maps those roles to the actual label strings used in this repo's issue tracker.
+The skills speak in terms of five canonical active triage roles. This file maps those roles to the actual label strings used in this repo's issue tracker. `resolved` is the terminal closure status for completed issues, not an active triage label, so it is not listed below.
 
 | Label in mattpocock/skills | Label in our tracker | Meaning                                  |
 | -------------------------- | -------------------- | ---------------------------------------- |

@@ -22,11 +22,14 @@ _Avoid_: block (Devin's wire word)
 The `bash` block of a mode in the config file. It decides verdicts for bash commands.
 _Avoid_: config, rules
 
+**OpenCode policy**:
+An OpenCode rule that can deny an action regardless of permission rules; it cannot allow an action. It is distinct from this plugin's **Policy** and **Mode**.
+
 **Policy file**:
 A configuration file containing one or more modes, each with a bash policy.
 
 **Mode**:
-A named policy in the config file. `default` is required. One mode applies per setup, chosen by the plugin's `mode` option.
+A named choice of bash policy in a policy file. The `default` mode is required.
 
 **Engine**:
 The bash evaluator from `lovely-bash-permissions`. It takes one policy and one command line and returns a verdict.

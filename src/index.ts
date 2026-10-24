@@ -33,7 +33,11 @@ export default Plugin.define({
     if (policy.status === "valid") {
       for (const warning of policy.warnings) console.warn(warning);
     }
-    let startup = await checkStartup(engine, selectMode(policy, mode), bashSources(layers, mode));
+    let activePermissionState = await checkStartup(
+      engine,
+      selectMode(policy, mode),
+      bashSources(layers, mode),
+    );
 
     await ctx.rpc.register(MODE_RPC, {
       listModes: async () => modeList(policy, activeMode),
@@ -44,7 +48,7 @@ export default Plugin.define({
         if (policy.status === "absent" || !Object.hasOwn(policy.modes, requestedMode)) {
           return { status: "invalid-mode", mode: requestedMode };
         }
-        if (activeMode === requestedMode && startup.status === "ready") {
+        if (activeMode === requestedMode && activePermissionState.status === "ready") {
           return { status: "unchanged", activeMode };
         }
 
@@ -62,7 +66,7 @@ export default Plugin.define({
 
         const status = activeMode === requestedMode ? "unchanged" : "changed";
         activeMode = requestedMode;
-        startup = candidate;
+        activePermissionState = candidate;
         return { status, activeMode };
       },
     });
@@ -71,7 +75,7 @@ export default Plugin.define({
     await ctx.tool.hook("execute.after", forgetCommand);
     await ctx.permission.hook("evaluate", async (event) => {
       if (event.action !== SHELL_ACTION) return;
-      const evaluatedStartup = startup;
+      const evaluatedStartup = activePermissionState;
       if (evaluatedStartup.status === "failed") {
         deny(event, evaluatedStartup.message);
         return;
@@ -94,8 +98,8 @@ export default Plugin.define({
         );
       } catch (error) {
         if (!(error instanceof ProtocolMismatchError)) throw error;
-        startup = failure(protocolMismatchReason(error.found));
-        deny(event, startup.message);
+        activePermissionState = failure(protocolMismatchReason(error.found));
+        deny(event, activePermissionState.message);
       }
     });
   },
