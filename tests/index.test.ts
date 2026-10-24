@@ -49,7 +49,7 @@ test("setup registers the permission hooks and the Mode RPC", async () => {
 
 describe("when no engine can be found", () => {
   test("a shell call is denied with the install fix", async () => {
-    const harness = await startPlugin();
+    const harness = await startPlugin(projectWith({ default: { bash: BASH } }));
     const decision = await harness.evaluate({
       action: "shell",
       resources: ["git status"],
@@ -64,7 +64,7 @@ describe("when no engine can be found", () => {
       "missing",
       "lovely-pi-bash-permissions",
     );
-    const harness = await startPlugin();
+    const harness = await startPlugin(projectWith({ default: { bash: BASH } }));
     const decision = await harness.evaluate({
       action: "shell",
       resources: ["git status"],
@@ -456,12 +456,16 @@ describe("when the engine exits on start", () => {
     ).toEqual({ effect: "deny", message: DENIAL });
   });
 
-  test("with no policy file, every shell call is still denied", async () => {
+  test("with no policy file, shell calls ask without starting the engine", async () => {
     process.env.LOVELY_PI_BASH_PERMISSIONS_BIN = crashingEngine(1).path;
     const harness = await startPlugin();
-    expect(
-      await harness.evaluate({ action: "shell", resources: ["git status"], effect: "allow" }),
-    ).toEqual({ effect: "deny", message: DENIAL });
+    const decision = await harness.evaluate({
+      action: "shell",
+      resources: ["git status"],
+      effect: "allow",
+    });
+    expect(decision.effect).toBe("ask");
+    expect(decision.message).toContain("No modes configured; defaulting to ask.");
   });
 });
 

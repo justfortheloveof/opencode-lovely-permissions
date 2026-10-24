@@ -66,7 +66,20 @@ export default Plugin.define({
               context.data.session.get(route.sessionID)?.location ?? context.location;
             const modes = context.client.rpc(MODE_RPC);
             const loaded = await modes.listModes({}, { location });
-            if (loaded.status !== "ready" || loaded.modes.length === 0) return;
+            if (loaded.status === "invalid") {
+              await context.ui.dialog.alert({
+                title: "Lovely permissions Mode",
+                message: "Configuration invalid",
+              });
+              return;
+            }
+            if (loaded.status === "absent" || loaded.modes.length === 0) {
+              await context.ui.dialog.alert({
+                title: "Lovely permissions Mode",
+                message: "No modes configured.",
+              });
+              return;
+            }
 
             const selected = await context.ui.dialog.select({
               title: "Lovely permissions Mode",
@@ -75,7 +88,13 @@ export default Plugin.define({
             });
             if (selected === undefined) return;
 
-            await modes.setMode({ mode: selected }, { location });
+            const result = await modes.setMode({ mode: selected }, { location });
+            if (result.status === "invalid-policy") {
+              await context.ui.dialog.alert({
+                title: "Lovely permissions Mode",
+                message: `Configuration invalid for mode ${selected}.`,
+              });
+            }
           },
         },
       ],

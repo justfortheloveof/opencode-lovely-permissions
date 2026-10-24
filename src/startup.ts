@@ -31,6 +31,7 @@ export async function checkStartup(
   selection: ModeSelection,
   sources: readonly BashSource[],
 ): Promise<Startup> {
+  if (selection.status === "absent") return { status: "no-policy" };
   if (engine === undefined) return failure(ENGINE_NOT_FOUND_REASON, "engine");
   if (selection.status === "invalid") {
     return failure(invalidPolicyReason(selection.file, selection.reason), "policy");
@@ -65,7 +66,6 @@ export async function checkStartup(
     );
   }
 
-  if (selection.status === "absent") return { status: "no-policy" };
   return {
     status: "ready",
     engine,

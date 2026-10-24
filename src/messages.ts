@@ -74,6 +74,7 @@ export function noPolicyMessage(locations: {
   local: string;
 }): string {
   return askMessage([
+    "No modes configured; defaulting to ask.",
     `no global policy file at ${locations.global}`,
     `no project policy file at ${locations.project}`,
     `no local policy file at ${locations.local}`,

@@ -35,6 +35,7 @@ describe("ask banner rule", () => {
   test("returns the missing-policy ask with all three locations", () => {
     const message =
       `${ASK_LABEL}\n` +
+      "- No modes configured; defaulting to ask.\n" +
       "- no global policy file at /home/user/.config/opencode/lovely-bash-permissions.json\n" +
       "- no project policy file at .opencode/lovely-bash-permissions.json\n" +
       "- no local policy file at .opencode/lovely-bash-permissions.local.json";

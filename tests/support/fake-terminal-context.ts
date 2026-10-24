@@ -53,6 +53,8 @@ export interface TerminalPluginHarness {
   readonly modeChanges: Array<{ readonly mode: string; readonly location?: LocationRef }>;
   /** Toasts shown by the plugin. */
   readonly toasts: unknown[];
+  /** Alert dialogs shown by the plugin. */
+  readonly alertRequests: Array<{ readonly title: string; readonly message: string }>;
   /** Runs the registered composer-top slot with the host-provided input. */
   render(input: SlotInput): JSX.Element;
   /** Replaces a session's pending permissions and updates an active render. */
@@ -70,6 +72,7 @@ interface SessionState {
   readonly syncFailure?: Error;
   readonly modeList?: ModeList;
   readonly selectedMode?: string;
+  readonly setModeResult?: SetModeResult;
   readonly route?:
     | { readonly type: "session"; readonly sessionID: string }
     | { readonly type: "home" };
@@ -88,6 +91,7 @@ export async function startTerminalPlugin(
   const modeListLocations: Array<LocationRef | undefined> = [];
   const modeChanges: TerminalPluginHarness["modeChanges"] = [];
   const toasts: unknown[] = [];
+  const alertRequests: TerminalPluginHarness["alertRequests"] = [];
   const commands: Array<{ id?: string; slash?: { name: string }; run: () => unknown }> = [];
   const slots: RecordedSlot[] = [];
   const permissions = new Map<
@@ -130,7 +134,7 @@ export async function startTerminalPlugin(
             options?: { location?: LocationRef },
           ): Promise<SetModeResult> {
             modeChanges.push({ mode: input.mode, location: options?.location });
-            return { status: "changed", activeMode: input.mode };
+            return sessionState.setModeResult ?? { status: "changed", activeMode: input.mode };
           },
         };
       },
@@ -162,6 +166,10 @@ export async function startTerminalPlugin(
     },
     ui: {
       dialog: {
+        alert(options: { title: string; message: string }): Promise<void> {
+          alertRequests.push(options);
+          return Promise.resolve();
+        },
         select<Value>(options: {
           title: string;
           options: readonly { title: string; value: Value }[];
@@ -213,6 +221,7 @@ export async function startTerminalPlugin(
     modeListLocations,
     modeChanges,
     toasts,
+    alertRequests,
     render(input) {
       const slot = slots.find(({ path }) => path === "session.composer.top");
       if (slot === undefined) throw new Error("the plugin did not register session.composer.top");

@@ -137,11 +137,11 @@ describe("the engine request", () => {
     },
   );
 
-  test("with no policy file, setup checks the engine with an empty bash block, and a shell call is not sent to it", async () => {
+  test("with no policy file, setup does not need the engine, and a shell call is not sent to it", async () => {
     const engine = useEngine(verdict("ask", ASK_REASONS));
     const harness = await startPlugin();
     await judge(harness, "call_no_policy", "git status", "allow");
-    expect(engine.requests()).toEqual([{ op: "validate", config: {} }]);
+    expect(engine.requests()).toEqual([]);
   });
 });
 
@@ -293,6 +293,7 @@ describe("an invalid policy file", () => {
     const project = projectWith({ strict: { "*": "allow" } });
     const file = join(project, ".opencode", "lovely-permissions.jsonc");
     const harness = await startPlugin(project);
+    expect(await harness.modeList()).toEqual({ status: "invalid" });
     expect(await judge(harness, "call_invalid_policy", "git status", "allow")).toEqual({
       effect: "deny",
       message: `[♡ perms: ❤️ auto-rejected]\n- the policy file ${file} could not be used: it has no "default" mode. Fix the file and restart OpenCode.\nThe tool has not been run.`,
@@ -317,6 +318,7 @@ describe("with no policy file", () => {
     process.env.OPENCODE_CONFIG_DIR = globalDir;
     expected = [
       "[♡ perms: 💛 REQUIRES-USER-APPROVAL]",
+      "- No modes configured; defaulting to ask.",
       `- no global policy file at ${join(globalDir, "lovely-permissions.jsonc")}`,
       `- no project policy file at ${join(project, ".opencode", "lovely-permissions.jsonc")}`,
       `- no local policy file at ${join(project, ".opencode", "lovely-permissions.local.jsonc")}`,
@@ -326,6 +328,8 @@ describe("with no policy file", () => {
   test("every shell call asks, naming the three expected locations, whatever OpenCode's effect", async () => {
     useEngine(verdict("allow", ALLOW_REASONS));
     const harness = await startPlugin(project);
+    expect(await harness.modeList()).toEqual({ status: "absent" });
+    expect(harness.registered).toContain("permission.evaluate");
     expect(await judge(harness, "call_no_policy_allow", "git status", "allow")).toEqual({
       effect: "ask",
       message: expected,
@@ -341,6 +345,16 @@ describe("with no policy file", () => {
     const harness = await startPlugin(project);
     await judge(harness, "call_no_policy_engine", "git status", "allow");
     expect(evaluations(engine)).toEqual([]);
+  });
+
+  test("shell calls still ask when no engine is installed", async () => {
+    const harness = await startPlugin(project);
+
+    expect(await judge(harness, "call_no_policy_without_engine", "git status", "allow")).toEqual({
+      effect: "ask",
+      message: expected,
+    });
+    expect(harness.registered).toContain("permission.evaluate");
   });
 
   test("OpenCode's explicit deny still stands", async () => {

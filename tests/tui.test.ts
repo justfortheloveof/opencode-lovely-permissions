@@ -82,6 +82,53 @@ describe("terminal plugin", () => {
     expect(harness.modeChanges).toEqual([]);
   });
 
+  test("shows an empty-state modal when no Modes are configured", async () => {
+    const harness = await startTerminalPlugin({}, { modeList: { status: "absent" } });
+
+    await harness.runCommand("lovely-permissions-cfg");
+
+    expect(harness.alertRequests).toEqual([
+      { title: "Lovely permissions Mode", message: "No modes configured." },
+    ]);
+    expect(harness.pickerRequests).toEqual([]);
+    expect(harness.modeChanges).toEqual([]);
+    expect(harness.toasts).toEqual([]);
+  });
+
+  test("shows an invalid-configuration modal instead of an empty state", async () => {
+    const harness = await startTerminalPlugin({}, { modeList: { status: "invalid" } });
+
+    await harness.runCommand("lovely-permissions-cfg");
+
+    expect(harness.alertRequests).toEqual([
+      { title: "Lovely permissions Mode", message: "Configuration invalid" },
+    ]);
+    expect(harness.pickerRequests).toEqual([]);
+    expect(harness.modeChanges).toEqual([]);
+  });
+
+  test("explains when the selected Mode has an invalid Policy", async () => {
+    const harness = await startTerminalPlugin(
+      {},
+      {
+        modeList: { status: "ready", modes: ["default", "strict"], activeMode: "default" },
+        selectedMode: "strict",
+        setModeResult: { status: "invalid-policy", mode: "strict" },
+      },
+    );
+
+    await harness.runCommand("lovely-permissions-cfg");
+
+    expect(harness.modeChanges).toEqual([{ mode: "strict", location: { directory: "/current" } }]);
+    expect(harness.alertRequests).toEqual([
+      {
+        title: "Lovely permissions Mode",
+        message: "Configuration invalid for mode strict.",
+      },
+    ]);
+    expect(harness.toasts).toEqual([]);
+  });
+
   test("syncs the viewed session and its family on mount before displaying its pending ask", async () => {
     const message = "[♡ perms: 💛 REQUIRES-USER-APPROVAL]\n- synced ask reason";
     const harness = await startTerminalPlugin(
@@ -122,6 +169,18 @@ describe("terminal plugin", () => {
     const harness = await startTerminalPlugin({
       ses_viewed: [{ message }],
     });
+
+    expect(await visibleFrame(harness, "ses_viewed")).toContain(message);
+  });
+
+  test("shows the no-Modes reason and missing policy locations in the pending ask banner", async () => {
+    const message =
+      "[♡ perms: 💛 REQUIRES-USER-APPROVAL]\n" +
+      "- No modes configured; defaulting to ask.\n" +
+      "- no global policy file at /home/user/.config/opencode/lovely-permissions.jsonc\n" +
+      "- no project policy file at /project/.opencode/lovely-permissions.jsonc\n" +
+      "- no local policy file at /project/.opencode/lovely-permissions.local.jsonc";
+    const harness = await startTerminalPlugin({ ses_viewed: [{ message }] });
 
     expect(await visibleFrame(harness, "ses_viewed")).toContain(message);
   });
