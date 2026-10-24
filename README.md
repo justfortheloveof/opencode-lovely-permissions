@@ -1,4 +1,4 @@
-# opencode-lovely-bash-permissions
+# opencode-lovely-permissions
 
 OpenCode V2 plugin that evaluates agent shell commands against a shared bash policy.
 
@@ -11,7 +11,7 @@ Add the absolute path to a local checkout in `plugins` in your global or project
 ```jsonc
 {
   "$schema": "https://opencode.ai/config.json",
-  "plugins": ["/path/to/opencode-lovely-bash-permissions"],
+  "plugins": ["/path/to/opencode-lovely-permissions"],
 }
 ```
 
@@ -34,7 +34,7 @@ Add the plugin to `cli.json` at `$XDG_CONFIG_HOME/opencode/cli.json` (or `~/.con
 ```json
 {
   "$schema": "https://opencode.ai/cli.json",
-  "plugins": ["/path/to/opencode-lovely-bash-permissions"]
+  "plugins": ["/path/to/opencode-lovely-permissions"]
 }
 ```
 
@@ -77,7 +77,7 @@ The plugin uses `default` unless you set the `mode` option:
 {
   "plugins": [
     {
-      "package": "opencode-lovely-bash-permissions",
+      "package": "opencode-lovely-permissions",
       "options": { "mode": "strict" },
     },
   ],

@@ -3,7 +3,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, test } from "bun:test";
 import { Host } from "@opencode/plugin/host";
 // @ts-expect-error The generated package entry is JavaScript without declarations.
-import tuiPlugin from "opencode-lovely-bash-permissions/tui";
+import tuiPlugin from "opencode-lovely-permissions/tui";
 import rootEntry from "../index.ts";
 import plugin from "../src/index.ts";
 

@@ -1,4 +1,4 @@
-# OpenCode Lovely Bash Permissions
+# OpenCode Lovely Permissions
 
 A plugin that decides whether OpenCode may run each bash command, using the same policy vocabulary as the Pi and Devin clients.
 

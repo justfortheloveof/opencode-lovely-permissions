@@ -1,7 +1,7 @@
 {
-  "name": "opencode-lovely-bash-permissions",
+  "name": "opencode-lovely-permissions",
   "version": "0.1.0",
-  "description": "Lovely bash permissions for OpenCode",
+  "description": "Lovely permissions for OpenCode",
   "license": "MIT",
   "files": [
     "index.ts",

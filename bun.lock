@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "opencode-lovely-bash-permissions",
+      "name": "opencode-lovely-permissions",
       "dependencies": {
         "@opencode/plugin": "2.1.1",
         "jsonc-parser": "^3.3.1",
