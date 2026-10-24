@@ -4,7 +4,7 @@
 
 **Blocked by:** None (can start immediately).
 
-**Status:** ready-for-agent
+**Status:** claimed
 
 - [ ] The TUI entry registers `/lovely-permissions-cfg` without requiring arguments and exposes it when that entry is loaded.
 - [ ] The picker lists the distinct Mode names from the server's loaded, merged configuration for the current location and marks the active Mode.
