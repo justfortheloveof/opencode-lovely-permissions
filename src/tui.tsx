@@ -49,7 +49,7 @@ function AskBannerSlot(props: AskBannerProps) {
 }
 
 export default Plugin.define({
-  id: "lovely-bash-permissions",
+  id: "lovely-permissions",
   setup(context) {
     context.keymap.layer(() => ({
       mode: "global",

@@ -4,11 +4,11 @@
 
 **Blocked by:** None (can start immediately).
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] The server plugin id is `lovely-permissions`.
-- [ ] The TUI entry id is `lovely-permissions`.
-- [ ] The mode-switch RPC id is `rpc.lovely-permissions` and its vendor is `lovely-permissions`.
-- [ ] Tests asserting the plugin id, RPC id, and vendor use the new values.
-- [ ] The Engine binary name, `LOVELY_PI_BASH_PERMISSIONS_BIN`, the engine install URL, and the policy file names are unchanged.
-- [ ] `bun run test` passes.
+- [x] The server plugin id is `lovely-permissions`.
+- [x] The TUI entry id is `lovely-permissions`.
+- [x] The mode-switch RPC id is `rpc.lovely-permissions` and its vendor is `lovely-permissions`.
+- [x] Tests asserting the plugin id, RPC id, and vendor use the new values.
+- [x] The Engine binary name, `LOVELY_PI_BASH_PERMISSIONS_BIN`, the engine install URL, and the policy file names are unchanged.
+- [x] `bun run test` passes.

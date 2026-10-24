@@ -34,14 +34,14 @@ function rejecting(bash: Record<string, unknown>, error: string): Record<string,
 }
 
 test("the plugin has a stable identifier", () => {
-  expect(plugin.id).toBe("lovely-bash-permissions");
+  expect(plugin.id).toBe("lovely-permissions");
 });
 
 test("setup registers the permission hooks and the Mode RPC", async () => {
   const harness = await startPlugin();
   expect([...harness.registered].sort()).toEqual([
     "permission.evaluate",
-    "rpc.lovely-bash-permissions",
+    "rpc.lovely-permissions",
     "tool.execute.after",
     "tool.execute.before",
   ]);

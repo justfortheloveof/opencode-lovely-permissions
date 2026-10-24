@@ -57,7 +57,7 @@ const setModeOutput = standardSchema<SetModeResult, SetModeResult>(
 );
 
 export const MODE_RPC = {
-  id: "lovely-bash-permissions",
+  id: "lovely-permissions",
   methods: {
     listModes: { input: modeListInput, output: modeListOutput },
     setMode: { input: setModeInput, output: setModeOutput },
@@ -71,7 +71,7 @@ function standardSchema<Input, Output>(
   return {
     "~standard": {
       version: 1,
-      vendor: "lovely-bash-permissions",
+      vendor: "lovely-permissions",
       types: {
         input: undefined as unknown as Input,
         output: undefined as unknown as Output,

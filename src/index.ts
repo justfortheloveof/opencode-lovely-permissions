@@ -21,7 +21,7 @@ import { checkStartup, failure } from "./startup.ts";
 const SHELL_ACTION = "shell";
 
 export default Plugin.define({
-  id: "lovely-bash-permissions",
+  id: "lovely-permissions",
   async setup(ctx) {
     const engine = resolveEngine();
     const directory = ctx.location.directory;

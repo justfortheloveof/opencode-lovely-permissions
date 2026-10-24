@@ -124,7 +124,7 @@ export async function startTerminalPlugin(
     location: { directory: "/current" },
     client: {
       rpc(definition: { id: string }) {
-        if (definition.id !== "lovely-bash-permissions") {
+        if (definition.id !== "lovely-permissions") {
           throw new Error(`unexpected RPC definition: ${definition.id}`);
         }
         return {

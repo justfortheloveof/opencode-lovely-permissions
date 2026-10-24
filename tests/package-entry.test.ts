@@ -26,7 +26,7 @@ describe("package entry", () => {
     expect(manifest.files).toContain("dist");
     expect(manifest.scripts.prepack).toBe("bun run build");
     expect(existsSync(artifactPath)).toBe(true);
-    expect(tuiPlugin.id).toBe("lovely-bash-permissions");
+    expect(tuiPlugin.id).toBe("lovely-permissions");
   });
 
   test("a local package directory resolves its terminal entry through the host", () => {

@@ -36,9 +36,9 @@ describe("ask banner rule", () => {
     const message =
       `${ASK_LABEL}\n` +
       "- No modes configured; defaulting to ask.\n" +
-      "- no global policy file at /home/user/.config/opencode/lovely-bash-permissions.json\n" +
-      "- no project policy file at .opencode/lovely-bash-permissions.json\n" +
-      "- no local policy file at .opencode/lovely-bash-permissions.local.json";
+      "- no global policy file at /home/user/.config/opencode/lovely-permissions.json\n" +
+      "- no project policy file at .opencode/lovely-permissions.json\n" +
+      "- no local policy file at .opencode/lovely-permissions.local.json";
 
     expect(pickAskBannerMessage([{ message }])).toBe(message);
   });
