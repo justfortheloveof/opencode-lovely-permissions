@@ -55,6 +55,7 @@ describe("terminal plugin", () => {
     await harness.runCommand("lovely-permissions-cfg");
 
     expect(harness.slashCommands).toContain("lovely-permissions-cfg");
+    expect(harness.keymapLayerModes).toEqual(["global"]);
     expect(harness.pickerRequests).toHaveLength(1);
     expect(harness.pickerRequests[0]).toMatchObject({
       current: "default",

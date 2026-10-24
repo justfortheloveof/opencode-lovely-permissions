@@ -6,7 +6,7 @@
 
 **Status:** resolved
 
-- [x] The TUI entry registers `/lovely-permissions-cfg` without requiring arguments and exposes it when that entry is loaded.
+- [x] The TUI entry registers `/lovely-permissions-cfg` without requiring arguments on the global keymap layer, exposing it across input modes when that entry is loaded.
 - [x] The picker lists the distinct Mode names from the server's loaded, merged configuration for the current location and marks the active Mode.
 - [x] The server and TUI exchange Mode-list, active-Mode, and change requests through a typed RPC contract.
 - [x] Selecting a configured, engine-valid Mode changes the active Mode immediately for future permission evaluations across all sessions and subagent sessions in that location.

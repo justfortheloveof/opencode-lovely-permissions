@@ -52,6 +52,7 @@ export default Plugin.define({
   id: "lovely-bash-permissions",
   setup(context) {
     context.keymap.layer(() => ({
+      mode: "global",
       commands: [
         {
           id: "lovely-permissions-cfg",

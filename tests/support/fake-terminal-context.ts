@@ -41,6 +41,8 @@ export interface TerminalPluginHarness {
   readonly permissionSyncs: string[];
   /** Slash command names registered by the plugin. */
   readonly slashCommands: string[];
+  /** Input modes attached to keymap layers registered by the plugin. */
+  readonly keymapLayerModes: Array<string | undefined>;
   /** Mode picker dialogs opened by the plugin command. */
   readonly pickerRequests: Array<{
     readonly title: string;
@@ -89,6 +91,7 @@ export async function startTerminalPlugin(
   const permissionLookups: string[] = [];
   const permissionSyncs: string[] = [];
   const slashCommands: string[] = [];
+  const keymapLayerModes: Array<string | undefined> = [];
   const pickerRequests: TerminalPluginHarness["pickerRequests"] = [];
   const modeListLocations: Array<LocationRef | undefined> = [];
   const modeChanges: TerminalPluginHarness["modeChanges"] = [];
@@ -207,8 +210,15 @@ export async function startTerminalPlugin(
       },
     },
     keymap: {
-      layer(factory: () => { commands?: ReadonlyArray<(typeof commands)[number]> }) {
-        for (const command of factory().commands ?? []) {
+      layer(
+        factory: () => {
+          mode?: string;
+          commands?: ReadonlyArray<(typeof commands)[number]>;
+        },
+      ) {
+        const layer = factory();
+        keymapLayerModes.push(layer.mode);
+        for (const command of layer.commands ?? []) {
           commands.push(command);
           if (command.slash !== undefined) slashCommands.push(command.slash.name);
         }
@@ -223,6 +233,7 @@ export async function startTerminalPlugin(
     permissionLookups,
     permissionSyncs,
     slashCommands,
+    keymapLayerModes,
     pickerRequests,
     modeListLocations,
     modeChanges,
