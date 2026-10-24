@@ -53,7 +53,7 @@ The picker validates a Mode before switching. An invalid configured Policy leave
 - The server plugin remains active when no policy files are present. It keeps the existing no-Policy `ask` behavior instead of throwing during setup; throwing would remove the permission hook and leave shell behavior to OpenCode's own rules.
 - The initial Mode remains the plugin's configured `mode` option, defaulting to `default`. A temporary location-scoped override is kept only in server memory and is not written through OpenCode configuration or plugin storage.
 - The server plugin exposes a typed RPC contract for the TUI entry to read the loaded Mode list and current Mode and to request a Mode change. The shared contract is consumable by both plugin entries.
-- The RPC operates on the current session's location. The server maintains one active temporary Mode per location, shared by all sessions and subagents in that location.
+- The RPC operates on the current location. The TUI uses the session's location on a session route and the TUI context location on the home route, including a fresh session before its first message. The server maintains one active temporary Mode per location, shared by all sessions and subagents in that location.
 - The server reads and merges policy files at setup as it does today. The picker lists the loaded snapshot; changing policy files on disk does not hot-reload them.
 - The server validates that a requested Mode exists and validates its effective bash Policy with the engine before atomically updating the active Mode. Invalid choices do not change current state. Engine availability failures use the existing engine failure behavior rather than being treated as a policy-format error.
 - The permission hook reads the active Mode for each new permission evaluation. A Mode already captured by a permission evaluation is not changed retroactively.
@@ -61,13 +61,13 @@ The picker validates a Mode before switching. An invalid configured Policy leave
 - When no policy files contribute Modes, the existing permission hook sets non-denied shell requests to `ask`. It prepends “No modes configured; defaulting to ask.” to the existing missing-location reasons. An explicit OpenCode `deny` remains unchanged.
 - Invalid loaded policy configuration is represented separately from an absent configuration. The command displays “Configuration invalid”; invalid shell Policy continues to use the existing fail-closed permission behavior.
 - For a configured but invalid candidate Mode, the command leaves the active Mode unchanged and reports “Configuration invalid for mode <name>.” Selecting a valid Mode closes the picker without a success toast.
-- The command is registered on the TUI/CLI keymap's `global` layer so it remains discoverable across input modes, and is available only when that entry is loaded. The server plugin remains responsible for permission checks.
+- The command is registered on the TUI/CLI keymap's `global` layer so it remains discoverable across input modes, and is available only when that entry is loaded. It works from both the home route and session routes, using the context location when no session location is available. The server plugin remains responsible for permission checks.
 
 ## Testing Decisions
 
 - Good tests assert user-visible and permission-hook behavior: picker options and active selection, RPC results, selected Policy passed to the engine, permission effect and reason, and unchanged state after invalid or cancelled selections. Tests should not assert internal map shapes or helper-call order.
 - Test the server plugin through its existing fake OpenCode context and stub engine. Extend that harness only as needed to register and invoke the RPC, then verify a Mode change affects later permission evaluations and that no-Mode requests ask with the expected reasons.
-- Test the TUI entry through its existing fake terminal context and render harness. Mock the client RPC and dialog APIs to verify global-layer command registration, picker options, active Mode, empty-state modal, invalid-configuration display, and selection/cancellation behavior.
+- Test the TUI entry through its existing fake terminal context and render harness. Mock the client RPC and dialog APIs to verify global-layer command registration, home-route picker access and context-location fallback, picker options, active Mode, empty-state modal, invalid-configuration display, and selection/cancellation behavior.
 - Do not add a bespoke harness that boots or communicates with a running OpenCode server for this feature. Keep tests inside the repository's existing test files and fake contexts.
 - Record a full runtime test against an actual OpenCode server and TUI as future work; it is not an acceptance gate for this feature.
 - Prior art is the server plugin harness and stub engine used by the permission-verdict and setup tests, plus the TUI render harness and ask-banner tests.

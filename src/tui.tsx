@@ -61,10 +61,10 @@ export default Plugin.define({
           slash: { name: "lovely-permissions-cfg" },
           run: async () => {
             const route = context.ui.router.current();
-            if (route.type !== "session") return;
-
             const location =
-              context.data.session.get(route.sessionID)?.location ?? context.location;
+              route.type === "session"
+                ? (context.data.session.get(route.sessionID)?.location ?? context.location)
+                : context.location;
             const modes = context.client.rpc(MODE_RPC);
             const loaded = await modes.listModes({}, { location });
             if (loaded.status === "invalid") {

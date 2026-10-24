@@ -69,6 +69,21 @@ describe("terminal plugin", () => {
     expect(harness.toasts).toEqual([]);
   });
 
+  test("opens the Mode picker from the home route using the current location", async () => {
+    const harness = await startTerminalPlugin(
+      {},
+      {
+        modeList: { status: "ready", modes: ["default", "strict"], activeMode: "default" },
+        route: { type: "home" },
+      },
+    );
+
+    await harness.runCommand("lovely-permissions-cfg");
+
+    expect(harness.pickerRequests).toHaveLength(1);
+    expect(harness.modeListLocations).toEqual([{ directory: "/current" }]);
+  });
+
   test("cancelling the Mode picker leaves the server unchanged", async () => {
     const harness = await startTerminalPlugin(
       {},
