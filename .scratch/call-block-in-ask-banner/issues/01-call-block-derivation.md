@@ -4,13 +4,13 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] A shell ask whose `source` resolves to a message with a matching tool part yields the full command line with filetype `bash`
-- [ ] A running call's object input and a streaming call's string input both resolve to the same command line
-- [ ] A request without a `source` yields nothing
-- [ ] A `source` whose message is missing yields nothing
-- [ ] A `source` whose message has no matching tool part yields nothing
-- [ ] A non-shell action yields nothing
-- [ ] The derivation is a pure function of its inputs, mirroring the existing ask-banner pick rule as its house pattern
-- [ ] The module is exercised by its own test file, and the existing suite stays green
+- [x] A shell ask whose `source` resolves to a message with a matching tool part yields the full command line with filetype `bash`
+- [x] A running call's object input and a streaming call's string input both resolve to the same command line
+- [x] A request without a `source` yields nothing
+- [x] A `source` whose message is missing yields nothing
+- [x] A `source` whose message has no matching tool part yields nothing
+- [x] A non-shell action yields nothing
+- [x] The derivation is a pure function of its inputs, mirroring the existing ask-banner pick rule as its house pattern
+- [x] The module is exercised by its own test file, and the existing suite stays green
