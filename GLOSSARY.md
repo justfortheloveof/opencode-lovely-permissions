@@ -48,8 +48,12 @@ The `[♡ perms: …]` prefix on every message this plugin shows, naming the ver
 _Avoid_: tag, header
 
 **Ask banner**:
-The display of a pending ask's reasons while the user decides. It disappears once the ask is answered.
+The display of a pending ask's tool call and reasons while the user decides. It disappears once the ask is answered.
 _Avoid_: prompt, notice
+
+**Call block**:
+The syntax-highlighted display of an ask's tool call, shown in the ask banner. For a shell ask it is the full command line; for other tools it will be a prettified input.
+_Avoid_: command block, code block
 
 **Deny message**:
 The message for a denied command. It carries the brand label and the reasons, and the agent reads it.
