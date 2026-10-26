@@ -4,10 +4,10 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] The fake terminal context can seed a session's messages, and code under test can read, sync, and invalidate them the way the real plugin context's data collection does
-- [ ] The fake pending permissions can carry a `source`, an `action`, and an `id` alongside the existing message
-- [ ] The fake context exposes a renderer whose terminal dimensions the tests can set, and a theme the banner's styling can read
-- [ ] The frame-capture helper accepts a width and a height, defaulting to its current 80×6
-- [ ] The entire existing test suite passes unchanged — no production code is modified by this ticket
+- [x] The fake terminal context can seed a session's messages, and code under test can read, sync, and invalidate them the way the real plugin context's data collection does
+- [x] The fake pending permissions can carry a `source`, an `action`, and an `id` alongside the existing message
+- [x] The fake context exposes a renderer whose terminal dimensions the tests can set, and a theme the banner's styling can read
+- [x] The frame-capture helper accepts a width and a height, defaulting to its current 80×6
+- [x] The entire existing test suite passes unchanged — no production code is modified by this ticket
