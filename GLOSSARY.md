@@ -55,6 +55,10 @@ _Avoid_: prompt, notice
 The syntax-highlighted display of an ask's tool call, shown in the ask banner. For a shell ask it is the full command line; for other tools it will be a prettified input.
 _Avoid_: command block, code block
 
+**Family**:
+A session plus the subagent sessions it spawned. The ask banner gathers the asks of a viewed session's family, so a subagent's ask is decided in the parent's banner.
+_Avoid_: children
+
 **Deny message**:
 The message for a denied command. It carries the brand label and the reasons, and the agent reads it.
 _Avoid_: error, tool error

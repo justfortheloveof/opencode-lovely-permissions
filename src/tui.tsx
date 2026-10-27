@@ -3,7 +3,7 @@ import { onResize } from "@opentui/solid";
 import type { ColorInput, NativeResourceOwner, SyntaxStyle, ThemeTokenStyle } from "@opentui/core";
 import { createMemo, createSignal, onCleanup, onMount } from "solid-js";
 import { pickAskBannerMessage } from "./ask-banner.ts";
-import { pickCallBlock } from "./call-block.ts";
+import { pickCallBlock, type CallBlock } from "./call-block.ts";
 import { MODE_RPC } from "./mode-rpc.ts";
 
 /**
@@ -125,8 +125,7 @@ function buildSyntaxStyle(
 
 interface CallBlockProps {
   readonly context: Plugin.Context;
-  readonly content: string;
-  readonly filetype: string;
+  readonly block: CallBlock;
 }
 
 /**
@@ -182,19 +181,21 @@ function CallBlock(props: CallBlockProps) {
 
     const style = syntaxStyle();
     if (style === undefined) {
-      return <text content={props.content} wrapMode="word" style={{ maxHeight: maxHeight() }} />;
+      return (
+        <text content={props.block.content} wrapMode="word" style={{ maxHeight: maxHeight() }} />
+      );
     }
     return (
       <code
-        content={props.content}
-        filetype={props.filetype}
+        content={props.block.content}
+        filetype={props.block.filetype}
         wrapMode="word"
         syntaxStyle={style}
         style={{ maxHeight: maxHeight() }}
       />
     );
   } catch {
-    return <text content={props.content} wrapMode="word" />;
+    return <text content={props.block.content} wrapMode="word" />;
   }
 }
 
@@ -259,11 +260,7 @@ function AskBannerSlot(props: AskBannerProps) {
         return (
           <box flexDirection="column">
             <text>{label}</text>
-            <CallBlock
-              context={props.context}
-              content={callBlock.content}
-              filetype={callBlock.filetype}
-            />
+            <CallBlock context={props.context} block={callBlock} />
             <text>{reasons}</text>
           </box>
         );
