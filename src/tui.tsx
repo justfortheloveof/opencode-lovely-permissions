@@ -16,6 +16,12 @@ const CALL_BLOCK_HEIGHT_FRACTION = 0.5;
 /** One empty line above and below the command, so it reads apart from the label and reasons. */
 const CALL_BLOCK_MARGIN = { marginTop: 1, marginBottom: 1 };
 
+/**
+ * The block's scrollbox sizes its content to at least its viewport, which would pad a short
+ * command out to the full bound. Zero lets the block shrink to the command instead.
+ */
+const CALL_BLOCK_CONTENT = { minHeight: 0 };
+
 interface AskBannerProps {
   readonly context: Plugin.Context;
   readonly sessionID: string;
@@ -132,9 +138,10 @@ interface CallBlockProps {
 }
 
 /**
- * The call block: the ask's tool call as a word-wrapped, selectable code element bounded at
- * half the terminal height, so it scrolls inside itself and never pushes the composer off
- * screen. Without a buildable syntax style it degrades to the same block as plain text.
+ * The call block: the ask's tool call as a word-wrapped, selectable code element in a scrollbox
+ * bounded at half the terminal height, so it scrolls inside itself, under a scrollbar while it
+ * overflows, and never pushes the composer off screen. Without a buildable syntax style it
+ * degrades to the same block as plain text.
  */
 function CallBlock(props: CallBlockProps) {
   try {
@@ -188,21 +195,26 @@ function CallBlock(props: CallBlockProps) {
       const style = syntaxStyle();
       if (style === undefined) {
         return (
-          <text
-            content={props.block.content}
-            wrapMode="word"
+          <scrollbox
             style={{ maxHeight: maxHeight(), ...CALL_BLOCK_MARGIN }}
-          />
+            contentOptions={CALL_BLOCK_CONTENT}
+          >
+            <text content={props.block.content} wrapMode="word" />
+          </scrollbox>
         );
       }
       return (
-        <code
-          content={props.block.content}
-          filetype={props.block.filetype}
-          wrapMode="word"
-          syntaxStyle={style}
+        <scrollbox
           style={{ maxHeight: maxHeight(), ...CALL_BLOCK_MARGIN }}
-        />
+          contentOptions={CALL_BLOCK_CONTENT}
+        >
+          <code
+            content={props.block.content}
+            filetype={props.block.filetype}
+            wrapMode="word"
+            syntaxStyle={style}
+          />
+        </scrollbox>
       );
     };
   } catch {

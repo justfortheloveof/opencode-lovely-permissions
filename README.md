@@ -100,7 +100,7 @@ plugin through `opencode.jsonc` as shown in [Plugin](#plugin).
 
 ### The ask banner
 
-While a command is pending approval, the ask banner above the composer shows the brand label, the call block, and the reasons the policy gave. The call block is the command itself, syntax-highlighted, word-wrapped, and selectable. The block is at most half the terminal height; a longer command scrolls inside it, so the composer and prompt stay on screen. The banner appears for every ask it shows, including subagent asks, follows the ask being decided, and disappears with it. It is always on, with no setting to change that: the mode system governs policy levels, not display.
+While a command is pending approval, the ask banner above the composer shows the brand label, the call block, and the reasons the policy gave. The call block is the command itself, syntax-highlighted, word-wrapped, and selectable. The block is at most half the terminal height; a longer command scrolls inside it under a scrollbar, so the composer and prompt stay on screen. The banner appears for every ask it shows, including subagent asks, follows the ask being decided, and disappears with it. It is always on, with no setting to change that: the mode system governs policy levels, not display.
 
 ## Development
 

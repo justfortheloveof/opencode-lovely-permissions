@@ -1,5 +1,10 @@
 import { describe, expect, test } from "bun:test";
-import { CodeRenderable, TextRenderable, type Renderable } from "@opentui/core";
+import {
+  CodeRenderable,
+  ScrollBoxRenderable,
+  TextRenderable,
+  type Renderable,
+} from "@opentui/core";
 import { useRenderer } from "@opentui/solid";
 import type { PermissionSource, SessionMessageAssistant } from "@opencode/client";
 import { startTerminalPlugin } from "./support/fake-terminal-context.ts";
@@ -81,6 +86,26 @@ function findRenderables<T extends Renderable>(
   const found: T[] = node instanceof type ? [node] : [];
   for (const child of node.getChildren()) found.push(...findRenderables(child, type));
   return found;
+}
+
+/** A realistic multi-line command, taller than the block in a 10-row terminal. */
+const DOCKER_RUN = [
+  "docker run --rm \\",
+  "  --init \\",
+  "  --platform linux/amd64 \\",
+  "  --name lovely-perms-e2e \\",
+  '  -v "$PWD":/workspace \\',
+  "  -w /workspace \\",
+  "  -e CI=true \\",
+  "  -e NODE_ENV=test \\",
+  "  -e LOG_LEVEL=debug \\",
+  "  node:22-bookworm \\",
+  '  sh -c "pnpm install --frozen-lockfile && pnpm test:e2e && pnpm build"',
+].join("\n");
+
+/** Whether any row of a frame shows the text; the scrollbar may share the row. */
+function showsRow(frameLines: string[], text: string): boolean {
+  return frameLines.some((line) => line.includes(text));
 }
 
 describe("terminal plugin", () => {
@@ -481,19 +506,7 @@ describe("terminal plugin", () => {
   });
 
   test("clips a tall command to half the terminal height at two sizes, with the rest scrollable", async () => {
-    const command = [
-      "docker run --rm \\",
-      "  --init \\",
-      "  --platform linux/amd64 \\",
-      "  --name lovely-perms-e2e \\",
-      '  -v "$PWD":/workspace \\',
-      "  -w /workspace \\",
-      "  -e CI=true \\",
-      "  -e NODE_ENV=test \\",
-      "  -e LOG_LEVEL=debug \\",
-      "  node:22-bookworm \\",
-      '  sh -c "pnpm install --frozen-lockfile && pnpm test:e2e && pnpm build"',
-    ].join("\n");
+    const command = DOCKER_RUN;
     const lines = command.split("\n");
     const message = askMessage([DOCKER_REASON]);
 
@@ -511,21 +524,53 @@ describe("terminal plugin", () => {
         async (setup) => {
           const frameLines = visibleText(setup.captureCharFrame()).split("\n");
           expect(frameLines).toHaveLength(bound + 4);
-          expect(frameLines).toContain(lines[0]);
-          expect(frameLines).toContain(lines[bound - 1]);
-          expect(frameLines).not.toContain(lines[bound]);
+          expect(showsRow(frameLines, lines[0])).toBe(true);
+          expect(showsRow(frameLines, lines[bound - 1])).toBe(true);
+          expect(showsRow(frameLines, lines[bound])).toBe(false);
 
-          const block = findRenderables(setup.renderer.root, TextRenderable).find((node) =>
-            node.plainText.includes(lines[0]),
-          );
-          expect(block).toBeDefined();
-          block!.scrollY = block!.maxScrollY;
+          const scrollbox = findRenderables(setup.renderer.root, ScrollBoxRenderable)[0];
+          expect(scrollbox).toBeDefined();
+          expect(scrollbox!.verticalScrollBar.visible).toBe(true);
+          scrollbox!.scrollTop = Math.max(0, scrollbox!.scrollHeight - scrollbox!.viewport.height);
           await setup.renderOnce();
           const scrolledLines = visibleText(setup.captureCharFrame()).split("\n");
-          expect(scrolledLines).toContain(lines[lines.length - 1]);
-          expect(scrolledLines).not.toContain(lines[0]);
+          expect(showsRow(scrolledLines, lines[lines.length - 1])).toBe(true);
+          expect(showsRow(scrolledLines, lines[0])).toBe(false);
         },
         { width: 80, height },
+      );
+    }
+  });
+
+  test("shows a scrollbar only while the command overflows the block", async () => {
+    const cases = [
+      { command: "bun test tests/tui.test.ts", reason: BUN_REASON, overflows: false },
+      { command: DOCKER_RUN, reason: DOCKER_REASON, overflows: true },
+    ];
+
+    for (const { command, reason, overflows } of cases) {
+      const harness = await startTerminalPlugin(
+        {
+          ses_viewed: [{ action: "shell", source: shellSource, message: askMessage([reason]) }],
+        },
+        {},
+        { ses_viewed: [shellMessage(command)] },
+      );
+      harness.setTerminalSize(80, 10);
+
+      await withTestRender(
+        () => harness.render({ sessionID: "ses_viewed" }),
+        (setup) => {
+          const scrollbox = findRenderables(setup.renderer.root, ScrollBoxRenderable)[0];
+          expect(scrollbox).toBeDefined();
+          expect(scrollbox!.verticalScrollBar.visible).toBe(overflows);
+
+          // The block's rows sit below the label and its blank line, at the 5-row bound.
+          const rows = setup.captureCharFrame().split("\n");
+          const scrollbarDrawn = rows.slice(2, 7).some((row) => row.at(-1) !== " ");
+          expect(scrollbarDrawn).toBe(overflows);
+        },
+        { width: 80, height: 10 },
       );
     }
   });
