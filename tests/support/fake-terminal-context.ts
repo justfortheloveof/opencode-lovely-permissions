@@ -102,6 +102,8 @@ export interface TerminalPluginHarness {
   setMessages(sessionID: string, messages: readonly SessionMessageInfo[]): void;
   /** Sets the terminal size the fake renderer reports, updating an active render. */
   setTerminalSize(width: number, height: number): void;
+  /** Sets the native scene the fake renderer exposes; a real one lets the syntax style build. */
+  setNativeScene(scene: unknown): void;
   /** Replaces the theme the plugin reads, updating an active render. */
   setTheme(theme: Theme): void;
   /** Runs a registered slash command by its name. */
@@ -165,6 +167,7 @@ export async function startTerminalPlugin(
   const familyBySession = sessionState.familyBySession ?? {};
   const [terminalWidth, setTerminalWidth] = createSignal(80);
   const [terminalHeight, setTerminalHeight] = createSignal(6);
+  let nativeScene: unknown;
   const [theme, setTheme] = createSignal<Theme>(defaultTheme);
 
   function permissionSignal(sessionID: string) {
@@ -197,6 +200,9 @@ export async function startTerminalPlugin(
       },
       get terminalHeight() {
         return terminalHeight();
+      },
+      get nativeScene() {
+        return nativeScene;
       },
     },
     client: {
@@ -361,6 +367,9 @@ export async function startTerminalPlugin(
     setTerminalSize(width, height) {
       setTerminalWidth(width);
       setTerminalHeight(height);
+    },
+    setNativeScene(scene) {
+      nativeScene = scene;
     },
     setTheme(nextTheme) {
       setTheme(nextTheme);

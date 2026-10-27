@@ -16,3 +16,7 @@
 - [x] The block is syntax-styled from the host theme and degrades to unstyled text when no style can be built
 - [x] When the derivation yields nothing, the frame matches today's label-and-reasons banner exactly
 - [x] The server half and the ask-banner pick rule are untouched
+
+## Comments
+
+Reopened after review: the styled `<code>` branch was never reached in a real host. `CallBlock` read the syntax style once at setup, before the style class loaded asynchronously, so every block stayed on the unstyled fallback. The fix reads the style inside an accessor. The regression test "draws the call block as a code element once the host's syntax style is available" covers it. The styled-theme criterion above was ticked without a test that could reach the styled branch, so it was not actually met until this fix.

@@ -179,21 +179,25 @@ function CallBlock(props: CallBlockProps) {
       setResizeRevision((revision) => revision + 1);
     });
 
-    const style = syntaxStyle();
-    if (style === undefined) {
+    // Read inside an accessor: the style class loads after mount, so a read at setup would pin
+    // the unstyled fallback for the life of the block.
+    return () => {
+      const style = syntaxStyle();
+      if (style === undefined) {
+        return (
+          <text content={props.block.content} wrapMode="word" style={{ maxHeight: maxHeight() }} />
+        );
+      }
       return (
-        <text content={props.block.content} wrapMode="word" style={{ maxHeight: maxHeight() }} />
+        <code
+          content={props.block.content}
+          filetype={props.block.filetype}
+          wrapMode="word"
+          syntaxStyle={style}
+          style={{ maxHeight: maxHeight() }}
+        />
       );
-    }
-    return (
-      <code
-        content={props.block.content}
-        filetype={props.block.filetype}
-        wrapMode="word"
-        syntaxStyle={style}
-        style={{ maxHeight: maxHeight() }}
-      />
-    );
+    };
   } catch {
     return <text content={props.block.content} wrapMode="word" />;
   }

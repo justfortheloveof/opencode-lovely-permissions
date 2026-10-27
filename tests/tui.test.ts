@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { TextRenderable, type Renderable } from "@opentui/core";
+import { CodeRenderable, TextRenderable, type Renderable } from "@opentui/core";
+import { useRenderer } from "@opentui/solid";
 import type { PermissionSource, SessionMessageAssistant } from "@opencode/client";
 import { startTerminalPlugin } from "./support/fake-terminal-context.ts";
 import { withTestRender } from "./support/test-render.ts";
@@ -58,10 +59,13 @@ function textMessage(): SessionMessageAssistant {
   };
 }
 
-/** The text renderables in the tree, for reaching the block's scroll state. */
-function findTextRenderables(node: Renderable): TextRenderable[] {
-  const found: TextRenderable[] = node instanceof TextRenderable ? [node] : [];
-  for (const child of node.getChildren()) found.push(...findTextRenderables(child));
+/** The renderables of one type in the tree, for reaching the block's element and scroll state. */
+function findRenderables<T extends Renderable>(
+  node: Renderable,
+  type: new (...args: never[]) => T,
+): T[] {
+  const found: T[] = node instanceof type ? [node] : [];
+  for (const child of node.getChildren()) found.push(...findRenderables(child, type));
   return found;
 }
 
@@ -449,7 +453,7 @@ describe("terminal plugin", () => {
         for (const line of frame.split("\n")) {
           expect(line.length).toBeLessThanOrEqual(80);
         }
-        const block = findTextRenderables(setup.renderer.root).find((node) =>
+        const block = findRenderables(setup.renderer.root, TextRenderable).find((node) =>
           node.plainText.includes("curl"),
         );
         expect(block).toBeDefined();
@@ -480,7 +484,7 @@ describe("terminal plugin", () => {
           expect(frame).toContain(`echo line-${bound - 1}`);
           expect(frame).not.toContain(`echo line-${bound}`);
 
-          const block = findTextRenderables(setup.renderer.root).find((node) =>
+          const block = findRenderables(setup.renderer.root, TextRenderable).find((node) =>
             node.plainText.includes("echo line-0"),
           );
           expect(block).toBeDefined();
@@ -673,6 +677,34 @@ describe("terminal plugin", () => {
         "echo subagent",
         "- subagent command needs approval",
       ].join("\n"),
+    );
+  });
+
+  test("draws the call block as a code element once the host's syntax style is available", async () => {
+    const message = "[♡ perms: 💛 REQUIRES-USER-APPROVAL]\n- runs a bash command";
+    const harness = await startTerminalPlugin(
+      { ses_viewed: [{ action: "shell", source: shellSource, message }] },
+      {},
+      { ses_viewed: [shellMessage("echo styled")] },
+    );
+
+    await withTestRender(
+      () => {
+        harness.setNativeScene(useRenderer().nativeScene);
+        return harness.render({ sessionID: "ses_viewed" });
+      },
+      async (setup) => {
+        // The style class loads after mount, so the block switches from text to code a moment later.
+        let blocks: CodeRenderable[] = [];
+        for (let attempt = 0; attempt < 100 && blocks.length === 0; attempt++) {
+          await setup.renderOnce();
+          blocks = findRenderables(setup.renderer.root, CodeRenderable);
+          if (blocks.length === 0) await new Promise((resolve) => setTimeout(resolve, 10));
+        }
+
+        expect(blocks).toHaveLength(1);
+        expect(blocks[0]!.plainText).toBe("echo styled");
+      },
     );
   });
 });
