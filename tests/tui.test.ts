@@ -4,7 +4,21 @@ import { useRenderer } from "@opentui/solid";
 import type { PermissionSource, SessionMessageAssistant } from "@opencode/client";
 import { startTerminalPlugin } from "./support/fake-terminal-context.ts";
 import { withTestRender } from "./support/test-render.ts";
+import { askMessage, noPolicyMessage } from "../src/messages.ts";
 import type { ModeList } from "../src/mode-rpc.ts";
+
+/**
+ * The reasons the bash engine gives for asks, captured by running lovely-pi-bash-permissions on
+ * these commands under a policy that asks for everything it does not allow.
+ */
+const NPM_REASON = '"npm" command does not match allowed patterns; wildcard policy is ask';
+const PNPM_REASON = '"pnpm" command does not match allowed patterns; wildcard policy is ask';
+const RM_REASON = '"rm" command does not match allowed patterns; wildcard policy is ask';
+const GIT_REASON = '"git" command does not match allowed patterns; wildcard policy is ask';
+const BUN_REASON = '"bun" command does not match allowed patterns; wildcard policy is ask';
+const DOCKER_REASON = '"docker" command does not match allowed patterns; wildcard policy is ask';
+const CURL_REASON = '"curl", "sh" commands do not match allowed patterns; wildcard policy is ask';
+const GREP_REASON = '"grep", "sort" commands do not match allowed patterns; wildcard policy is ask';
 
 function visibleText(frame: string): string {
   return frame
@@ -33,8 +47,8 @@ function shellMessage(command: string): SessionMessageAssistant {
     id: "msg_bash",
     time: { created: 0 },
     type: "assistant",
-    agent: "agent_test",
-    model: { id: "model_test", providerID: "provider_test" },
+    agent: "build",
+    model: { id: "claude-haiku-5.5", providerID: "github-copilot" },
     content: [
       {
         type: "tool",
@@ -53,9 +67,9 @@ function textMessage(): SessionMessageAssistant {
     id: "msg_text",
     time: { created: 0 },
     type: "assistant",
-    agent: "agent_test",
-    model: { id: "model_test", providerID: "provider_test" },
-    content: [{ type: "text", text: "no tool part" }],
+    agent: "build",
+    model: { id: "claude-haiku-5.5", providerID: "github-copilot" },
+    content: [{ type: "text", text: "I'll clear the build output first." }],
   };
 }
 
@@ -198,7 +212,7 @@ describe("terminal plugin", () => {
   });
 
   test("syncs the viewed session and its family on mount before displaying its pending ask", async () => {
-    const message = "[♡ perms: 💛 REQUIRES-USER-APPROVAL]\n- synced ask reason";
+    const message = askMessage([NPM_REASON]);
     const harness = await startTerminalPlugin(
       { ses_viewed: [], ses_child: [] },
       {
@@ -213,7 +227,7 @@ describe("terminal plugin", () => {
   });
 
   test("keeps the banner visible and suppresses unhandled sync failures", async () => {
-    const message = "[♡ perms: 💛 REQUIRES-USER-APPROVAL]\n- sync failure ask";
+    const message = askMessage([RM_REASON]);
     const harness = await startTerminalPlugin(
       { ses_viewed: [{ message }] },
       { syncFailure: new Error("permission sync unavailable") },
@@ -232,8 +246,7 @@ describe("terminal plugin", () => {
   });
 
   test("renders a branded ask using the rule's message verbatim", async () => {
-    const message =
-      "[♡ perms: 💛 REQUIRES-USER-APPROVAL]\n- the command matches no allowed pattern";
+    const message = askMessage([RM_REASON]);
     const harness = await startTerminalPlugin({
       ses_viewed: [{ message }],
     });
@@ -242,20 +255,25 @@ describe("terminal plugin", () => {
   });
 
   test("shows the no-Modes reason and missing policy locations in the pending ask banner", async () => {
-    const message =
-      "[♡ perms: 💛 REQUIRES-USER-APPROVAL]\n" +
-      "- No modes configured; defaulting to ask.\n" +
-      "- no global policy file at /home/user/.config/opencode/lovely-permissions.jsonc\n" +
-      "- no project policy file at /project/.opencode/lovely-permissions.jsonc\n" +
-      "- no local policy file at /project/.opencode/lovely-permissions.local.jsonc";
+    const message = noPolicyMessage({
+      global: "/home/dev/.config/opencode/lovely-permissions.jsonc",
+      project: "/home/dev/app/.opencode/lovely-permissions.jsonc",
+      local: "/home/dev/app/.opencode/lovely-permissions.local.jsonc",
+    });
     const harness = await startTerminalPlugin({ ses_viewed: [{ message }] });
 
-    expect(await visibleFrame(harness, "ses_viewed")).toContain(message);
+    await withTestRender(
+      () => harness.render({ sessionID: "ses_viewed" }),
+      (setup) => {
+        expect(visibleText(setup.captureCharFrame())).toBe(message);
+      },
+      { width: 100, height: 8 },
+    );
   });
 
   test("does not show unbranded or reasonless pending asks", async () => {
     for (const message of [
-      "[another tool]\n- another tool's reason",
+      `[another tool]\n- ${NPM_REASON}`,
       "[♡ perms: 💛 REQUIRES-USER-APPROVAL]",
     ]) {
       const harness = await startTerminalPlugin({ ses_viewed: [{ message }] });
@@ -263,13 +281,13 @@ describe("terminal plugin", () => {
       const frame = await visibleFrame(harness, "ses_viewed");
 
       expect(frame).not.toContain("REQUIRES-USER-APPROVAL");
-      expect(frame).not.toContain("another tool's reason");
+      expect(frame).not.toContain(NPM_REASON);
     }
   });
 
   test("updates the banner as its pending ask is answered", async () => {
-    const firstMessage = "[♡ perms: 💛 REQUIRES-USER-APPROVAL]\n- first reason";
-    const nextMessage = "[♡ perms: 💛 REQUIRES-USER-APPROVAL]\n- next reason";
+    const firstMessage = askMessage([NPM_REASON]);
+    const nextMessage = askMessage([PNPM_REASON]);
     const harness = await startTerminalPlugin({
       ses_viewed: [{ message: firstMessage }, { message: nextMessage }],
     });
@@ -304,7 +322,7 @@ describe("terminal plugin", () => {
   });
 
   test("renders a subagent ask in the root session's banner", async () => {
-    const message = "[♡ perms: 💛 REQUIRES-USER-APPROVAL]\n- subagent command needs approval";
+    const message = askMessage([BUN_REASON]);
     const harness = await startTerminalPlugin(
       {
         ses_root: [],
@@ -326,8 +344,8 @@ describe("terminal plugin", () => {
   });
 
   test("puts the viewed session's ask before its subagent asks", async () => {
-    const ownMessage = "[♡ perms: 💛 REQUIRES-USER-APPROVAL]\n- root command needs approval";
-    const childMessage = "[♡ perms: 💛 REQUIRES-USER-APPROVAL]\n- child command needs approval";
+    const ownMessage = askMessage([NPM_REASON]);
+    const childMessage = askMessage([PNPM_REASON]);
     const harness = await startTerminalPlugin(
       {
         ses_root: [{ message: ownMessage }],
@@ -351,8 +369,8 @@ describe("terminal plugin", () => {
   });
 
   test("uses family order for subagent asks", async () => {
-    const firstMessage = "[♡ perms: 💛 REQUIRES-USER-APPROVAL]\n- first child needs approval";
-    const secondMessage = "[♡ perms: 💛 REQUIRES-USER-APPROVAL]\n- second child needs approval";
+    const firstMessage = askMessage([BUN_REASON]);
+    const secondMessage = askMessage([DOCKER_REASON]);
     const harness = await startTerminalPlugin(
       {
         ses_root: [],
@@ -378,7 +396,7 @@ describe("terminal plugin", () => {
   });
 
   test("does not render a banner inside a subagent session", async () => {
-    const message = "[♡ perms: 💛 REQUIRES-USER-APPROVAL]\n- child command needs approval";
+    const message = askMessage([GIT_REASON]);
     const harness = await startTerminalPlugin(
       {
         ses_child: [{ message }],
@@ -406,29 +424,27 @@ describe("terminal plugin", () => {
   });
 
   test("shows the label, then the command, then the reasons in the banner", async () => {
-    const message = "[♡ perms: 💛 REQUIRES-USER-APPROVAL]\n- runs a bash command";
+    const message = askMessage([NPM_REASON]);
     const harness = await startTerminalPlugin(
       { ses_viewed: [{ action: "shell", source: shellSource, message }] },
       {},
-      { ses_viewed: [shellMessage("echo first\necho second")] },
+      { ses_viewed: [shellMessage("npm install --save-dev vitest")] },
     );
 
     expect(await visibleFrame(harness, "ses_viewed")).toBe(
       [
         "[♡ perms: 💛 REQUIRES-USER-APPROVAL]",
         "",
-        "echo first",
-        "echo second",
+        "npm install --save-dev vitest",
         "",
-        "- runs a bash command",
+        `- ${NPM_REASON}`,
       ].join("\n"),
     );
   });
 
   test("shows the full command line of a shell ask in the block", async () => {
-    const command = 'grep -rn "TODO" src/ | grep -v test | sort -u';
-    const message =
-      "[♡ perms: 💛 REQUIRES-USER-APPROVAL]\n- the command matches no allowed pattern";
+    const command = 'grep -rn "TODO" src/ | sort -u';
+    const message = askMessage([GREP_REASON]);
     const harness = await startTerminalPlugin(
       { ses_viewed: [{ action: "shell", source: shellSource, message }] },
       {},
@@ -439,9 +455,9 @@ describe("terminal plugin", () => {
   });
 
   test("word-wraps a command line wider than the frame inside the block", async () => {
-    const command = `curl -fsSL ${"https://example.com/install".repeat(3)} | sh`;
-    const message =
-      "[♡ perms: 💛 REQUIRES-USER-APPROVAL]\n- the command matches no allowed pattern";
+    const command =
+      "curl -fsSL https://raw.githubusercontent.com/justfortheloveof/lovely-bash-permissions/main/install.sh | sh";
+    const message = askMessage([CURL_REASON]);
     const harness = await startTerminalPlugin(
       { ses_viewed: [{ action: "shell", source: shellSource, message }] },
       {},
@@ -465,8 +481,21 @@ describe("terminal plugin", () => {
   });
 
   test("clips a tall command to half the terminal height at two sizes, with the rest scrollable", async () => {
-    const command = Array.from({ length: 20 }, (_, i) => `echo line-${i}`).join("\n");
-    const message = "[♡ perms: 💛 REQUIRES-USER-APPROVAL]\n- runs a bash command";
+    const command = [
+      "docker run --rm \\",
+      "  --init \\",
+      "  --platform linux/amd64 \\",
+      "  --name lovely-perms-e2e \\",
+      '  -v "$PWD":/workspace \\',
+      "  -w /workspace \\",
+      "  -e CI=true \\",
+      "  -e NODE_ENV=test \\",
+      "  -e LOG_LEVEL=debug \\",
+      "  node:22-bookworm \\",
+      '  sh -c "pnpm install --frozen-lockfile && pnpm test:e2e && pnpm build"',
+    ].join("\n");
+    const lines = command.split("\n");
+    const message = askMessage([DOCKER_REASON]);
 
     for (const height of [10, 20]) {
       const bound = Math.floor(height * 0.5);
@@ -480,21 +509,21 @@ describe("terminal plugin", () => {
       await withTestRender(
         () => harness.render({ sessionID: "ses_viewed" }),
         async (setup) => {
-          const frame = visibleText(setup.captureCharFrame());
-          expect(frame.split("\n")).toHaveLength(bound + 4);
-          expect(frame).toContain("echo line-0");
-          expect(frame).toContain(`echo line-${bound - 1}`);
-          expect(frame).not.toContain(`echo line-${bound}`);
+          const frameLines = visibleText(setup.captureCharFrame()).split("\n");
+          expect(frameLines).toHaveLength(bound + 4);
+          expect(frameLines).toContain(lines[0]);
+          expect(frameLines).toContain(lines[bound - 1]);
+          expect(frameLines).not.toContain(lines[bound]);
 
           const block = findRenderables(setup.renderer.root, TextRenderable).find((node) =>
-            node.plainText.includes("echo line-0"),
+            node.plainText.includes(lines[0]),
           );
           expect(block).toBeDefined();
           block!.scrollY = block!.maxScrollY;
           await setup.renderOnce();
-          const scrolled = visibleText(setup.captureCharFrame());
-          expect(scrolled).toContain(`echo line-${command.split("\n").length - 1}`);
-          expect(scrolled).not.toContain("echo line-0");
+          const scrolledLines = visibleText(setup.captureCharFrame()).split("\n");
+          expect(scrolledLines).toContain(lines[lines.length - 1]);
+          expect(scrolledLines).not.toContain(lines[0]);
         },
         { width: 80, height },
       );
@@ -502,31 +531,36 @@ describe("terminal plugin", () => {
   });
 
   test("gives a short command only the lines it needs", async () => {
-    const message = "[♡ perms: 💛 REQUIRES-USER-APPROVAL]\n- runs a bash command";
+    const message = askMessage([BUN_REASON]);
     const harness = await startTerminalPlugin(
       { ses_viewed: [{ action: "shell", source: shellSource, message }] },
       {},
-      { ses_viewed: [shellMessage("echo short")] },
+      { ses_viewed: [shellMessage("bun test tests/tui.test.ts")] },
     );
 
     expect(await visibleFrame(harness, "ses_viewed")).toBe(
-      ["[♡ perms: 💛 REQUIRES-USER-APPROVAL]", "", "echo short", "", "- runs a bash command"].join(
-        "\n",
-      ),
+      [
+        "[♡ perms: 💛 REQUIRES-USER-APPROVAL]",
+        "",
+        "bun test tests/tui.test.ts",
+        "",
+        `- ${BUN_REASON}`,
+      ].join("\n"),
     );
   });
 
   test("renders the same frame when the theme has no syntax colors", async () => {
-    const message = "[♡ perms: 💛 REQUIRES-USER-APPROVAL]\n- runs a bash command";
+    const command = "git diff --stat main...HEAD";
+    const message = askMessage([GIT_REASON]);
     const styled = await startTerminalPlugin(
       { ses_viewed: [{ action: "shell", source: shellSource, message }] },
       {},
-      { ses_viewed: [shellMessage("echo unstyled")] },
+      { ses_viewed: [shellMessage(command)] },
     );
     const unstyled = await startTerminalPlugin(
       { ses_viewed: [{ action: "shell", source: shellSource, message }] },
       {},
-      { ses_viewed: [shellMessage("echo unstyled")] },
+      { ses_viewed: [shellMessage(command)] },
     );
     unstyled.setTheme({ syntax: {} });
 
@@ -536,8 +570,7 @@ describe("terminal plugin", () => {
   });
 
   test("matches today's banner exactly when the derivation yields nothing", async () => {
-    const message =
-      "[♡ perms: 💛 REQUIRES-USER-APPROVAL]\n- the command matches no allowed pattern";
+    const message = askMessage([RM_REASON]);
     const cases: Array<{
       readonly ask: {
         readonly action?: string;
@@ -547,11 +580,11 @@ describe("terminal plugin", () => {
       readonly messages: readonly SessionMessageAssistant[];
     }> = [
       // A sourceless ask cannot be recovered.
-      { ask: { action: "shell", message }, messages: [shellMessage("echo hidden")] },
+      { ask: { action: "shell", message }, messages: [shellMessage("rm -rf dist coverage")] },
       // A source, but for an action with no call block.
       {
         ask: { action: "edit", source: shellSource, message },
-        messages: [shellMessage("echo hidden")],
+        messages: [shellMessage("rm -rf dist coverage")],
       },
       // A source whose message is missing.
       { ask: { action: "shell", source: shellSource, message }, messages: [] },
@@ -570,13 +603,13 @@ describe("terminal plugin", () => {
   });
 
   test("re-derives the block when the chosen ask changes", async () => {
-    const firstMessage = "[♡ perms: 💛 REQUIRES-USER-APPROVAL]\n- first reason";
-    const nextMessage = "[♡ perms: 💛 REQUIRES-USER-APPROVAL]\n- next reason";
+    const firstMessage = askMessage([RM_REASON]);
+    const nextMessage = askMessage([PNPM_REASON]);
     const next = { action: "shell", source: shellSource, message: nextMessage };
     const harness = await startTerminalPlugin(
       { ses_viewed: [{ message: firstMessage }, next] },
       {},
-      { ses_viewed: [shellMessage("echo next")] },
+      { ses_viewed: [shellMessage("pnpm install --frozen-lockfile")] },
     );
 
     await withTestRender(
@@ -586,10 +619,16 @@ describe("terminal plugin", () => {
 
         harness.setPermissions("ses_viewed", [next]);
         const frame = await setup.waitForFrame((candidate) =>
-          visibleText(candidate).includes("echo next"),
+          visibleText(candidate).includes("pnpm install --frozen-lockfile"),
         );
         expect(visibleText(frame)).toBe(
-          ["[♡ perms: 💛 REQUIRES-USER-APPROVAL]", "", "echo next", "", "- next reason"].join("\n"),
+          [
+            "[♡ perms: 💛 REQUIRES-USER-APPROVAL]",
+            "",
+            "pnpm install --frozen-lockfile",
+            "",
+            `- ${PNPM_REASON}`,
+          ].join("\n"),
         );
       },
     );
@@ -608,7 +647,7 @@ describe("terminal plugin", () => {
   });
 
   test("keeps the banner visible and suppresses unhandled message sync failures", async () => {
-    const message = "[♡ perms: 💛 REQUIRES-USER-APPROVAL]\n- message sync failure ask";
+    const message = askMessage([NPM_REASON]);
     const harness = await startTerminalPlugin(
       { ses_viewed: [{ message }] },
       { messageSyncFailure: new Error("message sync unavailable") },
@@ -627,8 +666,7 @@ describe("terminal plugin", () => {
   });
 
   test("fills the block in when a message arrives after the banner has rendered", async () => {
-    const message =
-      "[♡ perms: 💛 REQUIRES-USER-APPROVAL]\n- the command matches no allowed pattern";
+    const message = askMessage([PNPM_REASON]);
     const harness = await startTerminalPlugin(
       { ses_viewed: [{ action: "shell", source: shellSource, message }] },
       {},
@@ -641,17 +679,17 @@ describe("terminal plugin", () => {
         // Without the message the derivation yields nothing: today's label-and-reasons banner.
         expect(visibleText(setup.captureCharFrame())).toBe(message);
 
-        harness.setMessages("ses_viewed", [shellMessage("echo late")]);
+        harness.setMessages("ses_viewed", [shellMessage("pnpm install --frozen-lockfile")]);
         const frame = await setup.waitForFrame((candidate) =>
-          visibleText(candidate).includes("echo late"),
+          visibleText(candidate).includes("pnpm install --frozen-lockfile"),
         );
         expect(visibleText(frame)).toBe(
           [
             "[♡ perms: 💛 REQUIRES-USER-APPROVAL]",
             "",
-            "echo late",
+            "pnpm install --frozen-lockfile",
             "",
-            "- the command matches no allowed pattern",
+            `- ${PNPM_REASON}`,
           ].join("\n"),
         );
       },
@@ -659,7 +697,7 @@ describe("terminal plugin", () => {
   });
 
   test("shows a subagent ask's call block in the parent's banner from the family session's messages", async () => {
-    const message = "[♡ perms: 💛 REQUIRES-USER-APPROVAL]\n- subagent command needs approval";
+    const message = askMessage([BUN_REASON]);
     const harness = await startTerminalPlugin(
       {
         ses_root: [],
@@ -674,26 +712,22 @@ describe("terminal plugin", () => {
           ses_root: ["ses_root", "ses_child"],
         },
       },
-      { ses_child: [shellMessage("echo subagent")] },
+      { ses_child: [shellMessage("bun run build")] },
     );
 
     expect(await visibleFrame(harness, "ses_root")).toBe(
-      [
-        "[♡ perms: 💛 REQUIRES-USER-APPROVAL]",
-        "",
-        "echo subagent",
-        "",
-        "- subagent command needs approval",
-      ].join("\n"),
+      ["[♡ perms: 💛 REQUIRES-USER-APPROVAL]", "", "bun run build", "", `- ${BUN_REASON}`].join(
+        "\n",
+      ),
     );
   });
 
   test("draws the call block as a code element once the host's syntax style is available", async () => {
-    const message = "[♡ perms: 💛 REQUIRES-USER-APPROVAL]\n- runs a bash command";
+    const message = askMessage([PNPM_REASON]);
     const harness = await startTerminalPlugin(
       { ses_viewed: [{ action: "shell", source: shellSource, message }] },
       {},
-      { ses_viewed: [shellMessage("echo styled")] },
+      { ses_viewed: [shellMessage("pnpm install --frozen-lockfile")] },
     );
 
     await withTestRender(
@@ -711,14 +745,14 @@ describe("terminal plugin", () => {
         }
 
         expect(blocks).toHaveLength(1);
-        expect(blocks[0]!.plainText).toBe("echo styled");
+        expect(blocks[0]!.plainText).toBe("pnpm install --frozen-lockfile");
         expect(visibleText(setup.captureCharFrame())).toBe(
           [
             "[♡ perms: 💛 REQUIRES-USER-APPROVAL]",
             "",
-            "echo styled",
+            "pnpm install --frozen-lockfile",
             "",
-            "- runs a bash command",
+            `- ${PNPM_REASON}`,
           ].join("\n"),
         );
       },
