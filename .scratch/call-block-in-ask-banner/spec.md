@@ -106,3 +106,7 @@ Prior art: the pure ask-banner rule and its tests, the terminal plugin's fake-ha
 - The host reads its parser registrations at tree-sitter client initialization, and the TUI registers them at startup before any client exists, so plugin-rendered code elements pick them up. If a future host drops the `bash` registration, the block degrades to unstyled text rather than failing.
 - On terminals under roughly 24 lines the bottom stack (banner, prompt, composer) can still overflow slightly; this is accepted and recorded in ADR-0007.
 - The ½-viewport fraction is a tunable constant in the banner component; the design does not depend on the exact value.
+
+## Comments
+
+- The call block sits in a scrollbox, so a scrollbar shows while a command overflows the bound. This supersedes the "element's native scroll handling" wording in Implementation Decisions. The bound, the scrolling, and the other decisions still hold. The scrollbox sizes its content to the command, so short commands take no extra rows. ADR-0007 records the rationale.

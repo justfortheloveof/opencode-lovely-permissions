@@ -36,8 +36,12 @@ The bash evaluator from `lovely-bash-permissions`. It takes one policy and one c
 _Avoid_: parser
 
 **Permission request**:
-OpenCode's prompt asking the user to approve a tool action. This plugin sets its effect and message.
+OpenCode's prompt asking the user to approve a tool call. This plugin sets its effect and message.
 _Avoid_: permission (alone, since OpenCode uses that word for its own rules)
+
+**Tool call**:
+One invocation of an OpenCode tool, such as a shell command. A permission request asks for approval of one tool call.
+_Avoid_: tool action, invocation
 
 **Reason**:
 One line explaining a verdict. Several reasons show as bullets.
