@@ -6,9 +6,9 @@
 
 - 04: Banner recovers and tracks the prompt
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] The README describes the ask banner: brand label, reasons, and call block (highlighted, word-wrapped, half-viewport bound, self-scrolling, selectable)
-- [ ] The full bun test suite passes
-- [ ] The TUI entry builds
-- [ ] No changes are needed to the glossary, ADR-0007, or the server contract
+- [x] The README describes the ask banner: brand label, reasons, and call block (highlighted, word-wrapped, half-viewport bound, self-scrolling, selectable)
+- [x] The full bun test suite passes
+- [x] The TUI entry builds
+- [x] No changes are needed to the glossary, ADR-0007, or the server contract

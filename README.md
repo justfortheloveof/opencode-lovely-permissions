@@ -98,6 +98,10 @@ restores the configured `mode` option (or `default` when it is unset). The TUI c
 permission enforcement: add the plugin to `cli.json` as shown in [Terminal CLI](#terminal-cli), and load the server
 plugin through `opencode.jsonc` as shown in [Plugin](#plugin).
 
+### The ask banner
+
+While a command is pending approval, the ask banner above the composer shows the brand label, the reasons the policy gave, and the call block: the command itself, syntax-highlighted, word-wrapped, and selectable. The block is at most half the terminal height; a longer command scrolls inside it, so the composer and prompt stay on screen. The banner appears for every ask it shows, including subagent asks, follows the ask being decided, and disappears with it. It is always on, with no setting to change that: the mode system governs policy levels, not display.
+
 ## Development
 
 ```bash

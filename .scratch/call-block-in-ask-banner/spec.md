@@ -1,4 +1,4 @@
-Status: ready-for-agent
+Status: resolved
 
 # Add a highlighted call block to the ask banner
 
