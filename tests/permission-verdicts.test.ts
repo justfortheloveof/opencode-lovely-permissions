@@ -8,9 +8,19 @@ import { sandboxRoot } from "./support/sandbox.ts";
 import { evaluations, NEVER_ANSWERS, useEngine } from "./support/stub-engine.ts";
 
 const ALLOW_REASONS = ["command matches allowed pattern: ^git\\s+status$"];
-const ASK_REASONS = ["the command matches no allowed pattern", "it writes to a file"];
-const DENY_REASONS = ["the command matches a blocked pattern", "it reads /etc/passwd"];
+const ASK_REASONS = [
+  "output redirection requires approval",
+  '"cat" command is not allowlisted; wildcard policy is ask',
+];
+const GIT_ASK_REASONS = ['"git" command is not allowlisted; wildcard policy is ask'];
+const BLOCKED_CAT =
+  'Blocked by bash permissions: Argument "cat /etc/passwd" matches blocked pattern \\/etc\\/. The tool has not been run';
+const BLOCKED_REDIRECT =
+  'Blocked by bash permissions: Argument "cat /etc/passwd > out.txt" matches blocked pattern \\/etc\\/. The tool has not been run';
+const DENY_REASONS = [BLOCKED_CAT, BLOCKED_REDIRECT];
 const VALID_POLICY = { default: { bash: {} } };
+const ALLOW_POLICY = { default: { bash: { allowed_cmds_regex: ["^git\\s+status$"] } } };
+const DENY_POLICY = { default: { bash: { blocked_cmds_regex: ["\\/etc\\/"] } } };
 
 function verdict(action: string, reasons: string[]) {
   return { protocol: 1, valid: true, action, reason: reasons.join("; "), reasons };
@@ -19,7 +29,7 @@ function verdict(action: string, reasons: string[]) {
 describe("allow", () => {
   test("an allow verdict sets the allow effect and no message", async () => {
     useEngine(verdict("allow", ALLOW_REASONS));
-    const harness = await startPlugin(projectWith(VALID_POLICY));
+    const harness = await startPlugin(projectWith(ALLOW_POLICY));
     expect(await judge(harness, "call_allow", "git status", "allow")).toEqual({
       effect: "allow",
       message: undefined,
@@ -28,7 +38,7 @@ describe("allow", () => {
 
   test("an allow verdict replaces OpenCode's ask", async () => {
     useEngine(verdict("allow", ALLOW_REASONS));
-    const harness = await startPlugin(projectWith(VALID_POLICY));
+    const harness = await startPlugin(projectWith(ALLOW_POLICY));
     expect(await judge(harness, "call_allow_over_ask", "git status", "ask")).toEqual({
       effect: "allow",
       message: undefined,
@@ -43,7 +53,7 @@ describe("ask", () => {
     expect(await judge(harness, "call_ask", "cat notes > out.txt", "allow")).toEqual({
       effect: "ask",
       message:
-        "[♡ perms: 💛 REQUIRES-USER-APPROVAL]\n- the command matches no allowed pattern\n- it writes to a file",
+        '[♡ perms: 💛 REQUIRES-USER-APPROVAL]\n- output redirection requires approval\n- "cat" command is not allowlisted; wildcard policy is ask',
     });
   });
 });
@@ -51,43 +61,41 @@ describe("ask", () => {
 describe("deny", () => {
   test("a deny verdict sets the deny effect, the deny label, one bullet per reason, and the closing sentence", async () => {
     useEngine(verdict("deny", DENY_REASONS));
-    const harness = await startPlugin(projectWith(VALID_POLICY));
-    expect(await judge(harness, "call_deny", "cat /etc/passwd", "allow")).toEqual({
+    const harness = await startPlugin(projectWith(DENY_POLICY));
+    expect(await judge(harness, "call_deny", "cat /etc/passwd > out.txt", "allow")).toEqual({
       effect: "deny",
       message:
-        "[♡ perms: ❤️ auto-rejected]\n- the command matches a blocked pattern\n- it reads /etc/passwd\nThe tool has not been run.",
+        '[♡ perms: ❤️ auto-rejected]\n- Blocked by bash permissions: Argument "cat /etc/passwd" matches blocked pattern \\/etc\\/.\n- Blocked by bash permissions: Argument "cat /etc/passwd > out.txt" matches blocked pattern \\/etc\\/.\nThe tool has not been run.',
     });
   });
 
   test("a deny verdict replaces OpenCode's ask", async () => {
     useEngine(verdict("deny", DENY_REASONS));
-    const harness = await startPlugin(projectWith(VALID_POLICY));
-    expect(await judge(harness, "call_deny_over_ask", "cat /etc/passwd", "ask")).toEqual({
+    const harness = await startPlugin(projectWith(DENY_POLICY));
+    expect(await judge(harness, "call_deny_over_ask", "cat /etc/passwd > out.txt", "ask")).toEqual({
       effect: "deny",
       message:
-        "[♡ perms: ❤️ auto-rejected]\n- the command matches a blocked pattern\n- it reads /etc/passwd\nThe tool has not been run.",
+        '[♡ perms: ❤️ auto-rejected]\n- Blocked by bash permissions: Argument "cat /etc/passwd" matches blocked pattern \\/etc\\/.\n- Blocked by bash permissions: Argument "cat /etc/passwd > out.txt" matches blocked pattern \\/etc\\/.\nThe tool has not been run.',
     });
   });
 
   test("a reason that already ends with the closing sentence shows that sentence once, at the end", async () => {
-    const blocked =
-      'Blocked by bash permissions: Argument "/etc/passwd" matches blocked pattern /etc/. The tool has not been run';
-    useEngine(verdict("deny", [blocked, "it reads /etc/passwd"]));
-    const harness = await startPlugin(projectWith(VALID_POLICY));
+    useEngine(verdict("deny", [BLOCKED_CAT]));
+    const harness = await startPlugin(projectWith(DENY_POLICY));
     expect(await judge(harness, "call_deny_engine_sentence", "cat /etc/passwd", "allow")).toEqual({
       effect: "deny",
       message:
-        '[♡ perms: ❤️ auto-rejected]\n- Blocked by bash permissions: Argument "/etc/passwd" matches blocked pattern /etc/.\n- it reads /etc/passwd\nThe tool has not been run.',
+        '[♡ perms: ❤️ auto-rejected]\n- Blocked by bash permissions: Argument "cat /etc/passwd" matches blocked pattern \\/etc\\/.\nThe tool has not been run.',
     });
   });
 
   test("an action that is not a level is applied as a deny", async () => {
-    useEngine(verdict("maybe", ASK_REASONS));
+    useEngine(verdict("maybe", GIT_ASK_REASONS));
     const harness = await startPlugin(projectWith(VALID_POLICY));
     expect(await judge(harness, "call_unknown_action", "git status", "allow")).toEqual({
       effect: "deny",
       message:
-        "[♡ perms: ❤️ auto-rejected]\n- the command matches no allowed pattern\n- it writes to a file\nThe tool has not been run.",
+        '[♡ perms: ❤️ auto-rejected]\n- "git" command is not allowlisted; wildcard policy is ask\nThe tool has not been run.',
     });
   });
 });
@@ -138,7 +146,7 @@ describe("the engine request", () => {
   );
 
   test("with no policy file, setup does not need the engine, and a shell call is not sent to it", async () => {
-    const engine = useEngine(verdict("ask", ASK_REASONS));
+    const engine = useEngine(verdict("ask", GIT_ASK_REASONS));
     const harness = await startPlugin();
     await judge(harness, "call_no_policy", "git status", "allow");
     expect(engine.requests()).toEqual([]);
@@ -444,7 +452,7 @@ describe("an engine error for one command", () => {
 
   test("a parse failure the engine answers as a verdict is applied as the engine gave it", async () => {
     const reason =
-      "error evaluating command (policy 'deny'): Failed to parse: 1:4: `((` can only be used to open an arithmetic cmd";
+      "error evaluating command (policy 'deny'): Failed to parse: 1:1: `((` must be followed by an expression";
     useEngine(verdict("deny", [reason]));
     const harness = await startPlugin(
       projectWith({ default: { "*": "ask", bash: { error: "deny" } } }),

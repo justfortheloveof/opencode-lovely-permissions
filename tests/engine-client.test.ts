@@ -31,14 +31,21 @@ describe("evaluate", () => {
     const engine = stubEngine({
       protocol: 1,
       action: "ask",
-      reason: "first reason; second reason",
-      reasons: ["first reason", "second reason"],
+      reason:
+        'output redirection requires approval; "echo" command does not match allowed patterns; wildcard policy is ask',
+      reasons: [
+        "output redirection requires approval",
+        '"echo" command does not match allowed patterns; wildcard policy is ask',
+      ],
     });
     return expect(
-      evaluate(engine.path, { command: "rm -rf /", bash: BASH, topLevel: "ask" }),
+      evaluate(engine.path, { command: "echo hi > out.txt", bash: BASH, topLevel: "ask" }),
     ).resolves.toEqual({
       action: "ask",
-      reasons: ["first reason", "second reason"],
+      reasons: [
+        "output redirection requires approval",
+        '"echo" command does not match allowed patterns; wildcard policy is ask',
+      ],
     });
   });
 

@@ -116,7 +116,7 @@ describe("when the policy is valid", () => {
   });
 
   test("the plugin is not failed, so the engine's verdict is applied to a shell call", async () => {
-    const reason = "the command matches no allowed pattern";
+    const reason = '"rm" command does not match allowed patterns; wildcard policy is ask';
     useEngine({ protocol: 1, valid: true, action: "ask", reason, reasons: [reason] });
     const harness = await startPlugin(projectWith({ default: { bash: BASH } }));
     await harness.startCall({ tool: "shell", id: "call_valid", input: { command: "rm -rf /" } });
@@ -129,7 +129,8 @@ describe("when the policy is valid", () => {
       }),
     ).toEqual({
       effect: "ask",
-      message: "[♡ perms: 💛 REQUIRES-USER-APPROVAL]\n- the command matches no allowed pattern",
+      message:
+        '[♡ perms: 💛 REQUIRES-USER-APPROVAL]\n- "rm" command does not match allowed patterns; wildcard policy is ask',
     });
   });
 
