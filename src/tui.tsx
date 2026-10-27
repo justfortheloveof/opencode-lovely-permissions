@@ -13,6 +13,9 @@ import { MODE_RPC } from "./mode-rpc.ts";
  */
 const CALL_BLOCK_HEIGHT_FRACTION = 0.5;
 
+/** One empty line above and below the command, so it reads apart from the label and reasons. */
+const CALL_BLOCK_MARGIN = { marginTop: 1, marginBottom: 1 };
+
 interface AskBannerProps {
   readonly context: Plugin.Context;
   readonly sessionID: string;
@@ -185,7 +188,11 @@ function CallBlock(props: CallBlockProps) {
       const style = syntaxStyle();
       if (style === undefined) {
         return (
-          <text content={props.block.content} wrapMode="word" style={{ maxHeight: maxHeight() }} />
+          <text
+            content={props.block.content}
+            wrapMode="word"
+            style={{ maxHeight: maxHeight(), ...CALL_BLOCK_MARGIN }}
+          />
         );
       }
       return (
@@ -194,12 +201,12 @@ function CallBlock(props: CallBlockProps) {
           filetype={props.block.filetype}
           wrapMode="word"
           syntaxStyle={style}
-          style={{ maxHeight: maxHeight() }}
+          style={{ maxHeight: maxHeight(), ...CALL_BLOCK_MARGIN }}
         />
       );
     };
   } catch {
-    return <text content={props.block.content} wrapMode="word" />;
+    return <text content={props.block.content} wrapMode="word" style={CALL_BLOCK_MARGIN} />;
   }
 }
 

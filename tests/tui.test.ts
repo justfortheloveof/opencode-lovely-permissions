@@ -416,8 +416,10 @@ describe("terminal plugin", () => {
     expect(await visibleFrame(harness, "ses_viewed")).toBe(
       [
         "[♡ perms: 💛 REQUIRES-USER-APPROVAL]",
+        "",
         "echo first",
         "echo second",
+        "",
         "- runs a bash command",
       ].join("\n"),
     );
@@ -479,7 +481,7 @@ describe("terminal plugin", () => {
         () => harness.render({ sessionID: "ses_viewed" }),
         async (setup) => {
           const frame = visibleText(setup.captureCharFrame());
-          expect(frame.split("\n")).toHaveLength(bound + 2);
+          expect(frame.split("\n")).toHaveLength(bound + 4);
           expect(frame).toContain("echo line-0");
           expect(frame).toContain(`echo line-${bound - 1}`);
           expect(frame).not.toContain(`echo line-${bound}`);
@@ -508,7 +510,9 @@ describe("terminal plugin", () => {
     );
 
     expect(await visibleFrame(harness, "ses_viewed")).toBe(
-      ["[♡ perms: 💛 REQUIRES-USER-APPROVAL]", "echo short", "- runs a bash command"].join("\n"),
+      ["[♡ perms: 💛 REQUIRES-USER-APPROVAL]", "", "echo short", "", "- runs a bash command"].join(
+        "\n",
+      ),
     );
   });
 
@@ -585,7 +589,7 @@ describe("terminal plugin", () => {
           visibleText(candidate).includes("echo next"),
         );
         expect(visibleText(frame)).toBe(
-          ["[♡ perms: 💛 REQUIRES-USER-APPROVAL]", "echo next", "- next reason"].join("\n"),
+          ["[♡ perms: 💛 REQUIRES-USER-APPROVAL]", "", "echo next", "", "- next reason"].join("\n"),
         );
       },
     );
@@ -644,7 +648,9 @@ describe("terminal plugin", () => {
         expect(visibleText(frame)).toBe(
           [
             "[♡ perms: 💛 REQUIRES-USER-APPROVAL]",
+            "",
             "echo late",
+            "",
             "- the command matches no allowed pattern",
           ].join("\n"),
         );
@@ -674,7 +680,9 @@ describe("terminal plugin", () => {
     expect(await visibleFrame(harness, "ses_root")).toBe(
       [
         "[♡ perms: 💛 REQUIRES-USER-APPROVAL]",
+        "",
         "echo subagent",
+        "",
         "- subagent command needs approval",
       ].join("\n"),
     );
@@ -704,6 +712,15 @@ describe("terminal plugin", () => {
 
         expect(blocks).toHaveLength(1);
         expect(blocks[0]!.plainText).toBe("echo styled");
+        expect(visibleText(setup.captureCharFrame())).toBe(
+          [
+            "[♡ perms: 💛 REQUIRES-USER-APPROVAL]",
+            "",
+            "echo styled",
+            "",
+            "- runs a bash command",
+          ].join("\n"),
+        );
       },
     );
   });
