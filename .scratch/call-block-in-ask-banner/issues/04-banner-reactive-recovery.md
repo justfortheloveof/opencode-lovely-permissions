@@ -6,10 +6,10 @@
 
 - 03: Banner renders the call block
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] A message sync runs on mount for the viewed session and its family, alongside the permission sync
-- [ ] A message that arrives after the banner has already rendered fills the block in
-- [ ] Answering one ask switches the block to the next pending ask's call
-- [ ] A failing message read leaves the label and reasons rendered and produces no unhandled error
-- [ ] The banner and the prompt never disagree about which ask is being decided
+- [x] A message sync runs on mount for the viewed session and its family, alongside the permission sync
+- [x] A message that arrives after the banner has already rendered fills the block in
+- [x] Answering one ask switches the block to the next pending ask's call
+- [x] A failing message read leaves the label and reasons rendered and produces no unhandled error
+- [x] The banner and the prompt never disagree about which ask is being decided

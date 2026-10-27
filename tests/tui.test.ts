@@ -617,4 +617,62 @@ describe("terminal plugin", () => {
       process.off("unhandledRejection", onUnhandledRejection);
     }
   });
+
+  test("fills the block in when a message arrives after the banner has rendered", async () => {
+    const message =
+      "[♡ perms: 💛 REQUIRES-USER-APPROVAL]\n- the command matches no allowed pattern";
+    const harness = await startTerminalPlugin(
+      { ses_viewed: [{ action: "shell", source: shellSource, message }] },
+      {},
+      { ses_viewed: [] },
+    );
+
+    await withTestRender(
+      () => harness.render({ sessionID: "ses_viewed" }),
+      async (setup) => {
+        // Without the message the derivation yields nothing: today's label-and-reasons banner.
+        expect(visibleText(setup.captureCharFrame())).toBe(message);
+
+        harness.setMessages("ses_viewed", [shellMessage("echo late")]);
+        const frame = await setup.waitForFrame((candidate) =>
+          visibleText(candidate).includes("echo late"),
+        );
+        expect(visibleText(frame)).toBe(
+          [
+            "[♡ perms: 💛 REQUIRES-USER-APPROVAL]",
+            "echo late",
+            "- the command matches no allowed pattern",
+          ].join("\n"),
+        );
+      },
+    );
+  });
+
+  test("shows a subagent ask's call block in the parent's banner from the family session's messages", async () => {
+    const message = "[♡ perms: 💛 REQUIRES-USER-APPROVAL]\n- subagent command needs approval";
+    const harness = await startTerminalPlugin(
+      {
+        ses_root: [],
+        ses_child: [{ action: "shell", source: shellSource, message }],
+      },
+      {
+        sessionsByID: {
+          ses_root: {},
+          ses_child: { parentID: "ses_root" },
+        },
+        familyBySession: {
+          ses_root: ["ses_root", "ses_child"],
+        },
+      },
+      { ses_child: [shellMessage("echo subagent")] },
+    );
+
+    expect(await visibleFrame(harness, "ses_root")).toBe(
+      [
+        "[♡ perms: 💛 REQUIRES-USER-APPROVAL]",
+        "echo subagent",
+        "- subagent command needs approval",
+      ].join("\n"),
+    );
+  });
 });
