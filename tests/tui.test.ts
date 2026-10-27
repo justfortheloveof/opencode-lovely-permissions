@@ -1,4 +1,6 @@
 import { describe, expect, test } from "bun:test";
+import { TextRenderable, type Renderable } from "@opentui/core";
+import type { PermissionSource, SessionMessageAssistant } from "@opencode/client";
 import { startTerminalPlugin } from "./support/fake-terminal-context.ts";
 import { withTestRender } from "./support/test-render.ts";
 import type { ModeList } from "../src/mode-rpc.ts";
@@ -19,6 +21,48 @@ async function visibleFrame(
     () => harness.render({ sessionID }),
     (setup) => visibleText(setup.captureCharFrame()),
   );
+}
+
+/** The source the test asks use: the bash tool part of `msg_bash`. */
+const shellSource: PermissionSource = { type: "tool", messageID: "msg_bash", id: "part_bash" };
+
+/** An assistant message whose single part is a running bash tool call with the given command. */
+function shellMessage(command: string): SessionMessageAssistant {
+  return {
+    id: "msg_bash",
+    time: { created: 0 },
+    type: "assistant",
+    agent: "agent_test",
+    model: { id: "model_test", providerID: "provider_test" },
+    content: [
+      {
+        type: "tool",
+        id: "part_bash",
+        name: "bash",
+        state: { status: "running", input: { command }, metadata: {} },
+        time: { created: 0 },
+      },
+    ],
+  };
+}
+
+/** An assistant message with only a text part, so a source pointing at it matches no tool. */
+function textMessage(): SessionMessageAssistant {
+  return {
+    id: "msg_text",
+    time: { created: 0 },
+    type: "assistant",
+    agent: "agent_test",
+    model: { id: "model_test", providerID: "provider_test" },
+    content: [{ type: "text", text: "no tool part" }],
+  };
+}
+
+/** The text renderables in the tree, for reaching the block's scroll state. */
+function findTextRenderables(node: Renderable): TextRenderable[] {
+  const found: TextRenderable[] = node instanceof TextRenderable ? [node] : [];
+  for (const child of node.getChildren()) found.push(...findTextRenderables(child));
+  return found;
 }
 
 describe("terminal plugin", () => {
@@ -355,5 +399,222 @@ describe("terminal plugin", () => {
     expect(() => harness.render({ sessionID: "ses_viewed" })).toThrow(
       "the plugin did not register session.composer.top",
     );
+  });
+
+  test("shows the label, then the command, then the reasons in the banner", async () => {
+    const message = "[♡ perms: 💛 REQUIRES-USER-APPROVAL]\n- runs a bash command";
+    const harness = await startTerminalPlugin(
+      { ses_viewed: [{ action: "shell", source: shellSource, message }] },
+      {},
+      { ses_viewed: [shellMessage("echo first\necho second")] },
+    );
+
+    expect(await visibleFrame(harness, "ses_viewed")).toBe(
+      [
+        "[♡ perms: 💛 REQUIRES-USER-APPROVAL]",
+        "echo first",
+        "echo second",
+        "- runs a bash command",
+      ].join("\n"),
+    );
+  });
+
+  test("shows the full command line of a shell ask in the block", async () => {
+    const command = 'grep -rn "TODO" src/ | grep -v test | sort -u';
+    const message =
+      "[♡ perms: 💛 REQUIRES-USER-APPROVAL]\n- the command matches no allowed pattern";
+    const harness = await startTerminalPlugin(
+      { ses_viewed: [{ action: "shell", source: shellSource, message }] },
+      {},
+      { ses_viewed: [shellMessage(command)] },
+    );
+
+    expect(await visibleFrame(harness, "ses_viewed")).toContain(command);
+  });
+
+  test("word-wraps a command line wider than the frame inside the block", async () => {
+    const command = `curl -fsSL ${"https://example.com/install".repeat(3)} | sh`;
+    const message =
+      "[♡ perms: 💛 REQUIRES-USER-APPROVAL]\n- the command matches no allowed pattern";
+    const harness = await startTerminalPlugin(
+      { ses_viewed: [{ action: "shell", source: shellSource, message }] },
+      {},
+      { ses_viewed: [shellMessage(command)] },
+    );
+
+    await withTestRender(
+      () => harness.render({ sessionID: "ses_viewed" }),
+      async (setup) => {
+        const frame = visibleText(setup.captureCharFrame());
+        for (const line of frame.split("\n")) {
+          expect(line.length).toBeLessThanOrEqual(80);
+        }
+        const block = findTextRenderables(setup.renderer.root).find((node) =>
+          node.plainText.includes("curl"),
+        );
+        expect(block).toBeDefined();
+        expect(block!.plainText).toContain(command);
+      },
+    );
+  });
+
+  test("clips a tall command to half the terminal height at two sizes, with the rest scrollable", async () => {
+    const command = Array.from({ length: 20 }, (_, i) => `echo line-${i}`).join("\n");
+    const message = "[♡ perms: 💛 REQUIRES-USER-APPROVAL]\n- runs a bash command";
+
+    for (const height of [10, 20]) {
+      const bound = Math.floor(height * 0.5);
+      const harness = await startTerminalPlugin(
+        { ses_viewed: [{ action: "shell", source: shellSource, message }] },
+        {},
+        { ses_viewed: [shellMessage(command)] },
+      );
+      harness.setTerminalSize(80, height);
+
+      await withTestRender(
+        () => harness.render({ sessionID: "ses_viewed" }),
+        async (setup) => {
+          const frame = visibleText(setup.captureCharFrame());
+          expect(frame.split("\n")).toHaveLength(bound + 2);
+          expect(frame).toContain("echo line-0");
+          expect(frame).toContain(`echo line-${bound - 1}`);
+          expect(frame).not.toContain(`echo line-${bound}`);
+
+          const block = findTextRenderables(setup.renderer.root).find((node) =>
+            node.plainText.includes("echo line-0"),
+          );
+          expect(block).toBeDefined();
+          block!.scrollY = block!.maxScrollY;
+          await setup.renderOnce();
+          const scrolled = visibleText(setup.captureCharFrame());
+          expect(scrolled).toContain(`echo line-${command.split("\n").length - 1}`);
+          expect(scrolled).not.toContain("echo line-0");
+        },
+        { width: 80, height },
+      );
+    }
+  });
+
+  test("gives a short command only the lines it needs", async () => {
+    const message = "[♡ perms: 💛 REQUIRES-USER-APPROVAL]\n- runs a bash command";
+    const harness = await startTerminalPlugin(
+      { ses_viewed: [{ action: "shell", source: shellSource, message }] },
+      {},
+      { ses_viewed: [shellMessage("echo short")] },
+    );
+
+    expect(await visibleFrame(harness, "ses_viewed")).toBe(
+      ["[♡ perms: 💛 REQUIRES-USER-APPROVAL]", "echo short", "- runs a bash command"].join("\n"),
+    );
+  });
+
+  test("renders the same frame when the theme has no syntax colors", async () => {
+    const message = "[♡ perms: 💛 REQUIRES-USER-APPROVAL]\n- runs a bash command";
+    const styled = await startTerminalPlugin(
+      { ses_viewed: [{ action: "shell", source: shellSource, message }] },
+      {},
+      { ses_viewed: [shellMessage("echo unstyled")] },
+    );
+    const unstyled = await startTerminalPlugin(
+      { ses_viewed: [{ action: "shell", source: shellSource, message }] },
+      {},
+      { ses_viewed: [shellMessage("echo unstyled")] },
+    );
+    unstyled.setTheme({ syntax: {} });
+
+    expect(await visibleFrame(unstyled, "ses_viewed")).toBe(
+      await visibleFrame(styled, "ses_viewed"),
+    );
+  });
+
+  test("matches today's banner exactly when the derivation yields nothing", async () => {
+    const message =
+      "[♡ perms: 💛 REQUIRES-USER-APPROVAL]\n- the command matches no allowed pattern";
+    const cases: Array<{
+      readonly ask: {
+        readonly action?: string;
+        readonly source?: PermissionSource;
+        readonly message?: string;
+      };
+      readonly messages: readonly SessionMessageAssistant[];
+    }> = [
+      // A sourceless ask cannot be recovered.
+      { ask: { action: "shell", message }, messages: [shellMessage("echo hidden")] },
+      // A source, but for an action with no call block.
+      {
+        ask: { action: "edit", source: shellSource, message },
+        messages: [shellMessage("echo hidden")],
+      },
+      // A source whose message is missing.
+      { ask: { action: "shell", source: shellSource, message }, messages: [] },
+      // A source whose message has no matching tool part.
+      { ask: { action: "shell", source: shellSource, message }, messages: [textMessage()] },
+    ];
+
+    for (const { ask, messages } of cases) {
+      const harness = await startTerminalPlugin(
+        { ses_viewed: [ask] },
+        {},
+        { ses_viewed: messages },
+      );
+      expect(await visibleFrame(harness, "ses_viewed")).toBe(message);
+    }
+  });
+
+  test("re-derives the block when the chosen ask changes", async () => {
+    const firstMessage = "[♡ perms: 💛 REQUIRES-USER-APPROVAL]\n- first reason";
+    const nextMessage = "[♡ perms: 💛 REQUIRES-USER-APPROVAL]\n- next reason";
+    const next = { action: "shell", source: shellSource, message: nextMessage };
+    const harness = await startTerminalPlugin(
+      { ses_viewed: [{ message: firstMessage }, next] },
+      {},
+      { ses_viewed: [shellMessage("echo next")] },
+    );
+
+    await withTestRender(
+      () => harness.render({ sessionID: "ses_viewed" }),
+      async (setup) => {
+        expect(visibleText(setup.captureCharFrame())).toBe(firstMessage);
+
+        harness.setPermissions("ses_viewed", [next]);
+        const frame = await setup.waitForFrame((candidate) =>
+          visibleText(candidate).includes("echo next"),
+        );
+        expect(visibleText(frame)).toBe(
+          ["[♡ perms: 💛 REQUIRES-USER-APPROVAL]", "echo next", "- next reason"].join("\n"),
+        );
+      },
+    );
+  });
+
+  test("syncs the viewed session's messages with the family on mount", async () => {
+    const harness = await startTerminalPlugin(
+      { ses_viewed: [], ses_child: [] },
+      { familyBySession: { ses_viewed: ["ses_viewed", "ses_child"] } },
+    );
+
+    await visibleFrame(harness, "ses_viewed");
+
+    expect(harness.permissionSyncs).toEqual(["ses_viewed", "ses_child"]);
+    expect(harness.messageSyncs).toEqual(["ses_viewed", "ses_child"]);
+  });
+
+  test("keeps the banner visible and suppresses unhandled message sync failures", async () => {
+    const message = "[♡ perms: 💛 REQUIRES-USER-APPROVAL]\n- message sync failure ask";
+    const harness = await startTerminalPlugin(
+      { ses_viewed: [{ message }] },
+      { messageSyncFailure: new Error("message sync unavailable") },
+    );
+    const unhandledErrors: unknown[] = [];
+    const onUnhandledRejection = (reason: unknown) => unhandledErrors.push(reason);
+    process.on("unhandledRejection", onUnhandledRejection);
+
+    try {
+      expect(await visibleFrame(harness, "ses_viewed")).toContain(message);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(unhandledErrors).toEqual([]);
+    } finally {
+      process.off("unhandledRejection", onUnhandledRejection);
+    }
   });
 });

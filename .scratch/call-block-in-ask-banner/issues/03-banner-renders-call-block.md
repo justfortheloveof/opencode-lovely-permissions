@@ -7,12 +7,12 @@
 - 01: Pure call-block derivation
 - 02: Extend the terminal test harness
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] The banner frame shows the brand label, then the command, then the reasons, in that order
-- [ ] The block shows the full command line for a shell ask, word-wrapped and selectable
-- [ ] A command longer than half the terminal height is clipped to the bound at two tested terminal sizes, with the remainder reachable by scrolling
-- [ ] A short command occupies only as many lines as it needs — the block adds no empty space
-- [ ] The block is syntax-styled from the host theme and degrades to unstyled text when no style can be built
-- [ ] When the derivation yields nothing, the frame matches today's label-and-reasons banner exactly
-- [ ] The server half and the ask-banner pick rule are untouched
+- [x] The banner frame shows the brand label, then the command, then the reasons, in that order
+- [x] The block shows the full command line for a shell ask, word-wrapped and selectable
+- [x] A command longer than half the terminal height is clipped to the bound at two tested terminal sizes, with the remainder reachable by scrolling
+- [x] A short command occupies only as many lines as it needs — the block adds no empty space
+- [x] The block is syntax-styled from the host theme and degrades to unstyled text when no style can be built
+- [x] When the derivation yields nothing, the frame matches today's label-and-reasons banner exactly
+- [x] The server half and the ask-banner pick rule are untouched
